@@ -97,7 +97,7 @@ uv run gensi process book.gensi --verbose
 
 The `.gensi` format is a TOML-based recipe format for generating EPUB files from web sources. See [gensi-format-specification.md](gensi-format-specification.md) for the complete specification.
 
-### Basic Example
+### Basic Example (Single Index)
 
 ```toml
 title = "My Favorite Blog"
@@ -108,12 +108,11 @@ language = "en"
 url = "https://my-blog.com/"
 selector = "img.site-logo"
 
+# Single index - articles will be at root level in EPUB
 [[index]]
-name = "Blog Archives"
 url = "https://my-blog.com/archives"
 type = "html"
-items = "li.archive-item"
-link = "a.item-link"
+links = "li.archive-item a"
 
 [article]
 content = "div.post-body"
@@ -125,6 +124,31 @@ remove = [
     ".comment-form",
     "nav.post-navigation"
 ]
+```
+
+### Example with Multiple Sections
+
+```toml
+title = "Multi-Source EPUB"
+author = "Various"
+language = "en"
+
+# Multiple indices - each will be a section in the EPUB
+[[index]]
+name = "Blog Posts"
+url = "https://example.com/blog"
+type = "html"
+links = "article.post a.title"
+
+[[index]]
+name = "News Articles"
+url = "https://example.com/news"
+type = "html"
+links = "div.article a.headline"
+
+[article]
+content = "div.content"
+title = "h1"
 ```
 
 ### Advanced Example with Python

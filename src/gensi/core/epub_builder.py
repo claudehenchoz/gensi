@@ -50,12 +50,12 @@ class EPUBBuilder:
         self.cover_image = image_name
         self.book.set_cover(image_name, image_data)
 
-    def add_section(self, section_name: str):
+    def add_section(self, section_name: Optional[str] = None):
         """
         Start a new section in the EPUB.
 
         Args:
-            section_name: The name of the section
+            section_name: The name of the section (None for root-level articles)
         """
         self.sections.append({
             'name': section_name,
@@ -151,15 +151,21 @@ class EPUBBuilder:
         spine = ['nav']
 
         for section in self.sections:
-            section_toc = []
             for article in section['articles']:
-                section_toc.append(article['chapter'])
                 spine.append(article['chapter'])
 
-            toc.append((
-                epub.Section(section['name']),
-                section_toc
-            ))
+            # If section has a name, create a nested structure
+            # Otherwise, add articles directly to root (for single index)
+            if section['name']:
+                section_toc = [article['chapter'] for article in section['articles']]
+                toc.append((
+                    epub.Section(section['name']),
+                    section_toc
+                ))
+            else:
+                # Add articles directly to root TOC
+                for article in section['articles']:
+                    toc.append(article['chapter'])
 
         self.book.toc = toc
         self.book.spine = spine

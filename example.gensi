@@ -10,13 +10,12 @@ language = "en"
 url = "https://example.com/blog"
 selector = "img.site-logo"
 
-# Article index - can have multiple [[index]] sections
+# Article index
+# Note: 'name' is only required when you have multiple [[index]] sections
 [[index]]
-name = "Recent Posts"
 url = "https://example.com/blog/archive"
 type = "html"
-items = "article.post"
-link = "a.post-link"
+links = "article.post a.post-link"
 
 # Default article extraction rules
 [article]

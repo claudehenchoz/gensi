@@ -96,21 +96,19 @@ class Extractor:
             return articles
 
         # Simple mode
-        items_selector = config.get('items')
-        link_selector = config.get('link')
+        links_selector = config.get('links')
 
-        if not items_selector or not link_selector:
-            raise ValueError("Index: 'items' and 'link' are required in simple mode")
+        if not links_selector:
+            raise ValueError("Index: 'links' is required in simple mode")
 
         articles = []
         try:
-            items = self.document.cssselect(items_selector)
-            for item in items:
-                link_elem = item.cssselect(link_selector)
-                if link_elem and len(link_elem) > 0:
-                    href = link_elem[0].get('href', '')
-                    if href:
-                        articles.append({'url': resolve_url(self.base_url, href)})
+            # Select all <a> elements matching the selector
+            link_elems = self.document.cssselect(links_selector)
+            for link_elem in link_elems:
+                href = link_elem.get('href', '')
+                if href:
+                    articles.append({'url': resolve_url(self.base_url, href)})
         except Exception as e:
             raise Exception(f"Failed to extract index articles: {str(e)}") from e
 

@@ -38,9 +38,13 @@ class GensiParser:
             raise ValueError("At least one [[index]] section is required")
 
         # Validate each index
+        num_indices = len(self.data['index'])
         for i, index in enumerate(self.data['index']):
-            if 'name' not in index or not index['name'].strip():
-                raise ValueError(f"Index {i}: 'name' is required and must be non-empty")
+            # 'name' is only required if there are multiple indices
+            if num_indices > 1:
+                if 'name' not in index or not index['name'].strip():
+                    raise ValueError(f"Index {i}: 'name' is required when there are multiple [[index]] sections")
+
             if 'url' not in index:
                 raise ValueError(f"Index {i}: 'url' is required")
             if 'type' not in index:
@@ -52,10 +56,8 @@ class GensiParser:
             if index['type'] == 'html':
                 # Check if using Python override or simple mode
                 if 'python' not in index:
-                    if 'items' not in index:
-                        raise ValueError(f"Index {i}: 'items' is required for HTML type")
-                    if 'link' not in index:
-                        raise ValueError(f"Index {i}: 'link' is required for HTML type")
+                    if 'links' not in index:
+                        raise ValueError(f"Index {i}: 'links' is required for HTML type (CSS selector pointing to <a> elements)")
 
         # Validate cover section if present
         if 'cover' in self.data:

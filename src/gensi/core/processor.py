@@ -81,25 +81,28 @@ class GensiProcessor:
 
             # First pass: collect all articles
             async with Fetcher() as fetcher:
-                for index_config in self.parser.indices:
-                    self._report_progress('index', message=f'Processing index: {index_config["name"]}')
+                for i, index_config in enumerate(self.parser.indices):
+                    # Use name if provided, otherwise None (for single index case)
+                    section_name = index_config.get('name')
+                    if section_name:
+                        self._report_progress('index', message=f'Processing index: {section_name}')
+                    else:
+                        self._report_progress('index', message='Processing articles')
 
                     articles = await self._process_index(fetcher, index_config)
                     total_articles += len(articles)
 
                     sections_data.append({
-                        'name': index_config['name'],
-                        'articles': articles
+                        'name': section_name,
+                        'articles': articles,
+                        'index': i  # Store index to match later
                     })
 
                 # Second pass: fetch and process articles in parallel
                 current_article = 0
                 for section in sections_data:
                     # Get article config for this section's index
-                    index_config = next(
-                        idx for idx in self.parser.indices
-                        if idx['name'] == section['name']
-                    )
+                    index_config = self.parser.indices[section['index']]
                     article_config = self.parser.get_article_config(index_config)
 
                     # Process articles with parallel limit
