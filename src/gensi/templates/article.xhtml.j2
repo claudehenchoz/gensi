@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{{ language }}">
+<head>
+    <title>{{ title }}</title>
+    <link rel="stylesheet" type="text/css" href="../styles/styles.css"/>
+</head>
+<body>
+    <article>
+        {% if title %}
+        <header>
+            <h1 class="article-title">{{ title }}</h1>
+            {% if author or date %}
+            <div class="article-meta">
+                {% if author %}<span class="author">by {{ author }}</span>{% endif %}
+                {% if date %}<span class="date">{{ date }}</span>{% endif %}
+            </div>
+            {% endif %}
+        </header>
+        {% endif %}
+
+        <div class="article-content">
+            {{ content|safe }}
+        </div>
+    </article>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{{ language }}">
+<head>
+    <title>Table of Contents</title>
+    <link rel="stylesheet" type="text/css" href="styles/styles.css"/>
+</head>
+<body>
+    <nav epub:type="toc" id="toc">
+        <h1>Table of Contents</h1>
+        <ol>
+            {% for section in sections %}
+            <li>
+                <span class="section-name">{{ section.name }}</span>
+                <ol>
+                    {% for article in section.articles %}
+                    <li>
+                        <a href="{{ article.href }}">{{ article.title }}</a>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </li>
+            {% endfor %}
+        </ol>
+    </nav>
+</body>
+</html>

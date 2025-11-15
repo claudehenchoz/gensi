@@ -15,3 +15,5 @@ The Python app should be both usable as a GUI app (which should be the default h
 * Use jinja2 and a template to apply a uniform article layout and style across all epubs
 * Make the code very well-structured and easy to maintain/extend
 * Make the code and README use 'uv' to manage the project
+
+Also: Create a todo list to keep track of your progress

@@ -1,0 +1,31 @@
+# Example .gensi file
+# This is a sample recipe for generating an EPUB from a blog
+
+title = "Example Blog EPUB"
+author = "Blog Author"
+language = "en"
+
+# Optional: Cover image
+[cover]
+url = "https://example.com/blog"
+selector = "img.site-logo"
+
+# Article index - can have multiple [[index]] sections
+[[index]]
+name = "Recent Posts"
+url = "https://example.com/blog/archive"
+type = "html"
+items = "article.post"
+link = "a.post-link"
+
+# Default article extraction rules
+[article]
+content = "div.post-content"
+title = "h1.post-title"
+author = "span.author-name"
+date = "time.published"
+remove = [
+    ".sidebar",
+    ".comments",
+    ".share-buttons"
+]
