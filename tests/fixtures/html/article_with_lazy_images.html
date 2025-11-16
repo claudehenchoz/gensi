@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Article with Lazy Loaded Images</title>
+</head>
+<body>
+    <article>
+        <h1 class="article-title">Article with Lazy Loaded Images</h1>
+        <div class="article-content">
+            <p>This article has lazy-loaded images.</p>
+            <img data-src="/images/lazy1.jpg" src="placeholder.jpg" alt="Lazy Image 1">
+            <p>Some text between images.</p>
+            <img data-lazy-src="/images/lazy2.png" src="placeholder.png" alt="Lazy Image 2">
+            <p>And more text.</p>
+        </div>
+    </article>
+</body>
+</html>

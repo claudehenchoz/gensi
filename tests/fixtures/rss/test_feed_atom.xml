@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>Test Atom Feed</title>
+    <link href="http://localhost/atom"/>
+    <updated>2025-01-17T10:00:00Z</updated>
+    <id>http://localhost/atom</id>
+
+    <entry>
+        <title>Atom Article 1</title>
+        <link href="http://localhost/atom_article1.html"/>
+        <id>http://localhost/atom_article1.html</id>
+        <updated>2025-01-15T10:00:00Z</updated>
+        <author>
+            <name>Atom Author 1</name>
+        </author>
+        <content type="html"><![CDATA[
+            <p>This is the full content of Atom article 1.</p>
+            <p>With <em>italic text</em> and formatting.</p>
+        ]]></content>
+    </entry>
+
+    <entry>
+        <title>Atom Article 2</title>
+        <link href="http://localhost/atom_article2.html"/>
+        <id>http://localhost/atom_article2.html</id>
+        <updated>2025-01-16T14:00:00Z</updated>
+        <author>
+            <name>Atom Author 2</name>
+        </author>
+        <content type="html"><![CDATA[
+            <p>This is the full content of Atom article 2.</p>
+            <blockquote>A quote in the content.</blockquote>
+        ]]></content>
+    </entry>
+</feed>

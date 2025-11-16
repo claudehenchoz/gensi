@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel>
+        <title>Test Blog</title>
+        <link>http://localhost/blog</link>
+        <description>A test blog for RSS testing</description>
+        <language>en-us</language>
+
+        <item>
+            <title>RSS Article 1</title>
+            <link>http://localhost/rss_article1.html</link>
+            <description>This is the first RSS article description</description>
+            <pubDate>Mon, 15 Jan 2025 10:00:00 GMT</pubDate>
+            <author>rss@example.com (RSS Author 1)</author>
+            <content:encoded><![CDATA[
+                <p>This is the full content of RSS article 1.</p>
+                <p>It includes <strong>HTML formatting</strong>.</p>
+            ]]></content:encoded>
+        </item>
+
+        <item>
+            <title>RSS Article 2</title>
+            <link>http://localhost/rss_article2.html</link>
+            <description>This is the second RSS article description</description>
+            <pubDate>Tue, 16 Jan 2025 14:00:00 GMT</pubDate>
+            <author>rss@example.com (RSS Author 2)</author>
+            <content:encoded><![CDATA[
+                <p>This is the full content of RSS article 2.</p>
+                <ul>
+                    <li>List item 1</li>
+                    <li>List item 2</li>
+                </ul>
+            ]]></content:encoded>
+        </item>
+
+        <item>
+            <title>RSS Article 3</title>
+            <link>http://localhost/rss_article3.html</link>
+            <description>This is the third RSS article description (no content:encoded)</description>
+            <pubDate>Wed, 17 Jan 2025 09:00:00 GMT</pubDate>
+            <author>rss@example.com (RSS Author 3)</author>
+        </item>
+    </channel>
+</rss>
