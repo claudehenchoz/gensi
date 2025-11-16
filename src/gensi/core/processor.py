@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
+from slugify import slugify
 
 from .parser import GensiParser
 from .fetcher import Fetcher
@@ -302,10 +303,8 @@ class GensiProcessor:
                     images=article.get('images', {})
                 )
 
-        # Generate output path
-        output_filename = f"{self.parser.title}.epub"
-        # Sanitize filename
-        output_filename = "".join(c for c in output_filename if c.isalnum() or c in (' ', '-', '_', '.')).strip()
+        # Generate output path using slugify
+        output_filename = f"{slugify(self.parser.title)}.epub"
         output_path = self.output_dir / output_filename
 
         # Build EPUB
