@@ -213,9 +213,12 @@ class GensiProcessor:
         # If content already provided, sanitize and return
         if 'content' in article_data and article_data['content']:
             sanitized_content = self.sanitizer.sanitize(article_data['content'])
-            # Process images
+            # Process images (check config for images setting, default to True)
             article_url = article_data['url']
-            sanitized_content, image_map = await process_article_images(sanitized_content, article_url, fetcher)
+            enable_images = article_config.get('images', True) if article_config else True
+            sanitized_content, image_map = await process_article_images(
+                sanitized_content, article_url, fetcher, enable_images
+            )
             return {
                 'url': article_url,
                 'content': sanitized_content,
@@ -247,7 +250,8 @@ class GensiProcessor:
                         sanitized = f"<p>Content could not be sanitized from {article_url}</p>"
 
                 # Process images (download and update references)
-                sanitized, image_map = await process_article_images(sanitized, final_url, fetcher)
+                enable_images = article_config.get('images', True) if article_config else True
+                sanitized, image_map = await process_article_images(sanitized, final_url, fetcher, enable_images)
 
                 extracted['content'] = sanitized
                 extracted['images'] = image_map  # Store image data

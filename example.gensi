@@ -28,3 +28,6 @@ remove = [
     ".comments",
     ".share-buttons"
 ]
+# Optional: Control image retrieval (default: true)
+# Set to false to skip image downloads and remove <img> tags
+# images = false

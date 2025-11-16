@@ -121,6 +121,29 @@ class ImageProcessor:
 
         return f"image_{index:03d}_{url_hash}{ext}"
 
+    def remove_images(self, html_content: str) -> str:
+        """
+        Remove all img tags from HTML content.
+
+        Args:
+            html_content: The HTML content to process
+
+        Returns:
+            HTML content with img tags removed
+        """
+        try:
+            doc = html.fromstring(html_content)
+
+            # Find and remove all img elements
+            for img in doc.xpath('//img'):
+                parent = img.getparent()
+                if parent is not None:
+                    parent.remove(img)
+
+            return etree.tostring(doc, encoding='unicode', method='html')
+        except Exception:
+            return html_content
+
     def update_image_references(self, html_content: str, base_url: str, image_map: dict[str, str]) -> str:
         """
         Update image src attributes to reference embedded images.
@@ -188,7 +211,8 @@ class ImageProcessor:
 async def process_article_images(
     html_content: str,
     base_url: str,
-    fetcher
+    fetcher,
+    enable_images: bool = True
 ) -> tuple[str, dict[str, tuple[str, bytes]]]:
     """
     Process images in article content.
@@ -197,12 +221,19 @@ async def process_article_images(
         html_content: The HTML content to process
         base_url: Base URL for the article
         fetcher: Fetcher instance for downloading
+        enable_images: Whether to download images (default: True).
+                      If False, all img tags will be removed.
 
     Returns:
         Tuple of (updated_html_content, image_map)
         where image_map is {absolute_url: (filename, image_data)}
     """
     processor = ImageProcessor()
+
+    # If images are disabled, remove all img tags and return empty map
+    if not enable_images:
+        html_content = processor.remove_images(html_content)
+        return html_content, {}
 
     # First, normalize lazy-loaded images
     html_content = processor.normalize_lazy_loaded_images(html_content)
