@@ -11,6 +11,7 @@ from .extractor import Extractor, parse_rss_feed
 from .sanitizer import Sanitizer
 from .python_executor import PythonExecutor
 from .epub_builder import EPUBBuilder
+from .image_processor import process_article_images
 
 
 @dataclass
@@ -212,12 +213,16 @@ class GensiProcessor:
         # If content already provided, sanitize and return
         if 'content' in article_data and article_data['content']:
             sanitized_content = self.sanitizer.sanitize(article_data['content'])
+            # Process images
+            article_url = article_data['url']
+            sanitized_content, image_map = await process_article_images(sanitized_content, article_url, fetcher)
             return {
-                'url': article_data['url'],
+                'url': article_url,
                 'content': sanitized_content,
                 'title': article_data.get('title'),
                 'author': article_data.get('author'),
-                'date': article_data.get('date')
+                'date': article_data.get('date'),
+                'images': image_map
             }
 
         # Fetch article
@@ -240,7 +245,14 @@ class GensiProcessor:
                     if not sanitized or not sanitized.strip():
                         # Last resort: use a placeholder
                         sanitized = f"<p>Content could not be sanitized from {article_url}</p>"
+
+                # Process images (download and update references)
+                sanitized, image_map = await process_article_images(sanitized, final_url, fetcher)
+
                 extracted['content'] = sanitized
+                extracted['images'] = image_map  # Store image data
+            else:
+                extracted['images'] = {}
 
             return extracted
         else:
@@ -250,7 +262,8 @@ class GensiProcessor:
                 'content': f'<p>No article configuration provided for {article_url}</p>',
                 'title': article_url,
                 'author': None,
-                'date': None
+                'date': None,
+                'images': {}
             }
 
     async def _build_epub(self, sections_data: list[dict]) -> Path:
@@ -281,7 +294,8 @@ class GensiProcessor:
                     content=article['content'],
                     title=article.get('title'),
                     author=article.get('author'),
-                    date=article.get('date')
+                    date=article.get('date'),
+                    images=article.get('images', {})
                 )
 
         # Generate output path

@@ -68,7 +68,8 @@ class EPUBBuilder:
         title: Optional[str] = None,
         author: Optional[str] = None,
         date: Optional[str] = None,
-        filename: Optional[str] = None
+        filename: Optional[str] = None,
+        images: Optional[dict] = None
     ) -> epub.EpubHtml:
         """
         Add an article to the current section.
@@ -113,6 +114,31 @@ class EPUBBuilder:
         # Add to book
         self.book.add_item(chapter)
         self.chapters.append(chapter)
+
+        # Add images if present
+        if images:
+            for img_url, (img_filename, img_data) in images.items():
+                # Determine media type from filename
+                ext = img_filename.split('.')[-1].lower()
+                media_type_map = {
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png',
+                    'gif': 'image/gif',
+                    'webp': 'image/webp',
+                    'svg': 'image/svg+xml',
+                    'bmp': 'image/bmp'
+                }
+                media_type = media_type_map.get(ext, 'image/jpeg')
+
+                # Create image item
+                img_item = epub.EpubItem(
+                    uid=f"img_{img_filename}",
+                    file_name=f"images/{img_filename}",
+                    media_type=media_type,
+                    content=img_data
+                )
+                self.book.add_item(img_item)
 
         # Add to current section
         self.sections[-1]['articles'].append({
