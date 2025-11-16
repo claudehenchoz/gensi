@@ -179,4 +179,27 @@ Based on git log:
 
 ## Testing
 
-Tests should be added to `tests/` directory. Use pytest with async support (`pytest-asyncio`).
+### Run All Tests
+```bash
+uv run pytest
+```
+
+### Run with Verbose Output
+```bash
+uv run pytest -v
+```
+
+### Run Specific Test File
+```bash
+uv run pytest tests/test_parser.py -v
+```
+
+### Run Specific Test
+```bash
+uv run pytest tests/test_parser.py::TestParserValidFiles::test_parse_simple_gensi -v
+```
+
+### Run Only Passing Tests
+```bash
+uv run pytest --lf --last-failed-no-failures none
+```
