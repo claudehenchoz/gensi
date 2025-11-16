@@ -216,6 +216,7 @@ dependencies = [
     { name = "pyside6" },
     { name = "python-slugify" },
     { name = "rich" },
+    { name = "typogrify" },
 ]
 
 [package.optional-dependencies]
@@ -244,6 +245,7 @@ requires-dist = [
     { name = "python-slugify", specifier = ">=8.0.0" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.8" },
+    { name = "typogrify", specifier = ">=2.0.7" },
 ]
 provides-extras = ["dev"]
 
@@ -726,6 +728,15 @@ wheels = [
 ]
 
 [[package]]
+name = "smartypants"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/8f/a033f78196d9467b402d100ec40b95166d43fa2642693f23f771473d8195/smartypants-2.0.2.tar.gz", hash = "sha256:39d64ce1d7cc6964b698297bdf391bc12c3251b7f608e6e55d857cd7c5f800c6", size = 16392, upload-time = "2025-06-17T07:59:48.122Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/2c/f12558bff677defbfc64bf32441daec245df608dd2d9a12168f1d766ad75/smartypants-2.0.2-py2.py3-none-any.whl", hash = "sha256:9471578606e8ee0740065bf8771f55fec8c83313cb98c5d1c1864ddd389d0f3a", size = 10168, upload-time = "2025-06-17T07:59:46.765Z" },
+]
+
+[[package]]
 name = "text-unidecode"
 version = "1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -741,4 +752,16 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/94/1a15dd82efb362ac84269196e94cf00f187f7ed21c242792a923cdb1c61f/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466", size = 109391, upload-time = "2025-08-25T13:49:26.313Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/18/67/36e9267722cc04a6b9f15c7f3441c2363321a3ea07da7ae0c0707beb2a9c/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548", size = 44614, upload-time = "2025-08-25T13:49:24.86Z" },
+]
+
+[[package]]
+name = "typogrify"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "smartypants" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/8c/b73fe0050bbf67c172b7c6d0c74c356939de0e891e669667f20381c099a8/typogrify-2.1.0.tar.gz", hash = "sha256:f0aa004e98032a6e6be4c9da65e7eb7150e36ca3bf508adbcda82b4d003e61ee", size = 28622, upload-time = "2025-01-12T16:38:12.431Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/7f/3221bc6bd429a78e37b96aac309a66512af35360b69c67d20bb5e4ef4e5b/typogrify-2.1.0-py3-none-any.whl", hash = "sha256:fdfd2bf8ad3df7296074187e89a890b68b116263bd4e0f4aefe768291b0d854e", size = 12411, upload-time = "2025-01-12T16:38:11.112Z" },
 ]

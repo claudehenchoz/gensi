@@ -13,6 +13,7 @@ from .sanitizer import Sanitizer
 from .python_executor import PythonExecutor
 from .epub_builder import EPUBBuilder
 from .image_processor import process_article_images
+from .typography import improve_typography
 
 
 @dataclass
@@ -214,6 +215,8 @@ class GensiProcessor:
         # If content already provided, sanitize and return
         if 'content' in article_data and article_data['content']:
             sanitized_content = self.sanitizer.sanitize(article_data['content'])
+            # Improve typography
+            sanitized_content = improve_typography(sanitized_content)
             # Process images (check config for images setting, default to True)
             article_url = article_data['url']
             enable_images = article_config.get('images', True) if article_config else True
@@ -249,6 +252,9 @@ class GensiProcessor:
                     if not sanitized or not sanitized.strip():
                         # Last resort: use a placeholder
                         sanitized = f"<p>Content could not be sanitized from {article_url}</p>"
+
+                # Improve typography
+                sanitized = improve_typography(sanitized)
 
                 # Process images (download and update references)
                 enable_images = article_config.get('images', True) if article_config else True
