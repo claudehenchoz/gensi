@@ -7,6 +7,16 @@ import tempfile
 import shutil
 
 
+def pytest_addoption(parser):
+    """Add custom command-line options."""
+    parser.addoption(
+        "--epub-output",
+        action="store",
+        default=None,
+        help="Directory to save generated EPUB files from tests"
+    )
+
+
 @pytest.fixture
 def fixtures_dir():
     """Return the fixtures directory path."""
@@ -38,10 +48,58 @@ def gensi_fixtures_dir(fixtures_dir):
 
 
 @pytest.fixture
-def temp_dir():
+def epub_output_dir(request):
+    """Get the EPUB output directory from command line option."""
+    output_dir = request.config.getoption("--epub-output")
+    if output_dir:
+        path = Path(output_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    return None
+
+
+@pytest.fixture
+def epub_saver(request, epub_output_dir):
+    """
+    Fixture to save EPUBs from tests.
+
+    Returns a callable that can be used to save an EPUB file with a test-specific name.
+    """
+    def save_epub(epub_path: Path, custom_name: str = None):
+        """Save an EPUB file to the output directory if specified."""
+        if not epub_output_dir or not epub_path or not epub_path.exists():
+            return
+
+        # Generate a name based on the test if custom name not provided
+        if custom_name:
+            output_name = custom_name
+        else:
+            # Use test name as the filename
+            test_name = request.node.name
+            # Clean up the test name to make it filesystem-friendly
+            output_name = test_name.replace('[', '_').replace(']', '').replace('::', '_')
+
+        # Ensure it ends with .epub
+        if not output_name.endswith('.epub'):
+            output_name += '.epub'
+
+        output_path = epub_output_dir / output_name
+        shutil.copy2(epub_path, output_path)
+        print(f"\nSaved EPUB: {output_path}")
+
+    return save_epub
+
+
+@pytest.fixture
+def temp_dir(epub_saver):
     """Create a temporary directory for test outputs."""
     temp_path = Path(tempfile.mkdtemp())
     yield temp_path
+
+    # Before cleanup, save any EPUB files if output directory is specified
+    for epub_file in temp_path.glob('*.epub'):
+        epub_saver(epub_file)
+
     # Cleanup
     shutil.rmtree(temp_path, ignore_errors=True)
 

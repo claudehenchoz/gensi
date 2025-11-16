@@ -203,3 +203,20 @@ uv run pytest tests/test_parser.py::TestParserValidFiles::test_parse_simple_gens
 ```bash
 uv run pytest --lf --last-failed-no-failures none
 ```
+
+### Save Generated EPUBs from Tests
+Tests can optionally save all generated EPUB files to a specified directory for external validation (e.g., with epubcheck):
+
+```bash
+# Save all EPUB files generated during tests
+uv run pytest --epub-output=./test_epubs
+
+# Run specific tests and save EPUBs
+uv run pytest tests/test_integration.py --epub-output=./output/epubs -v
+
+# Useful for validation with epubcheck
+uv run pytest --epub-output=./test_epubs
+epubcheck test_epubs/*.epub
+```
+
+Each EPUB will be saved with a name matching the test that generated it (e.g., `test_process_simple_gensi.epub`, `test_build_epub_with_cover.epub`).
