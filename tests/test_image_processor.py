@@ -38,7 +38,7 @@ class TestImageProcessor:
         processor = ImageProcessor()
         html = '<img data-src="/images/lazy.jpg" src="placeholder.jpg">'
 
-        result = processor.normalize_lazy_loading(html)
+        result = processor.normalize_lazy_loaded_images(html)
 
         # Should process the HTML
         assert result is not None

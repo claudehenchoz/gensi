@@ -187,10 +187,10 @@ url = "{httpserver.url_for('/blog_index.html')}"
 type = "html"
 links = "article.post-preview a.post-link"
 
-    [article]
-    content = "div.article-content"
-    title = "h1.article-title"
-    author = "span.author"
+[index.article]
+content = "div.article-content"
+title = "h1.article-title"
+author = "span.author"
 """
         gensi_path = temp_dir / 'override.gensi'
         gensi_path.write_text(gensi_content)

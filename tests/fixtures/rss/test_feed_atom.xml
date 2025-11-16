@@ -7,8 +7,8 @@
 
     <entry>
         <title>Atom Article 1</title>
-        <link href="http://localhost/atom_article1.html"/>
-        <id>http://localhost/atom_article1.html</id>
+        <link href="/atom_article1.html"/>
+        <id>atom_article1</id>
         <updated>2025-01-15T10:00:00Z</updated>
         <author>
             <name>Atom Author 1</name>
@@ -21,8 +21,8 @@
 
     <entry>
         <title>Atom Article 2</title>
-        <link href="http://localhost/atom_article2.html"/>
-        <id>http://localhost/atom_article2.html</id>
+        <link href="/atom_article2.html"/>
+        <id>atom_article2</id>
         <updated>2025-01-16T14:00:00Z</updated>
         <author>
             <name>Atom Author 2</name>

@@ -7,7 +7,7 @@
 
         <item>
             <title>Tagged Article 1</title>
-            <link>http://localhost/tagged1.html</link>
+            <link>/tagged1.html</link>
             <description>Article with Technology tag</description>
             <category>Technology</category>
             <category>Programming</category>
@@ -16,7 +16,7 @@
 
         <item>
             <title>Tagged Article 2</title>
-            <link>http://localhost/tagged2.html</link>
+            <link>/tagged2.html</link>
             <description>Article with Sponsor tag (should be filtered)</description>
             <category>Sponsor</category>
             <category>Technology</category>
@@ -25,7 +25,7 @@
 
         <item>
             <title>Tagged Article 3</title>
-            <link>http://localhost/tagged3.html</link>
+            <link>/tagged3.html</link>
             <description>Article without Technology tag</description>
             <category>Lifestyle</category>
             <content:encoded><![CDATA[<p>Content about lifestyle.</p>]]></content:encoded>
@@ -33,7 +33,7 @@
 
         <item>
             <title>Tagged Article 4</title>
-            <link>http://localhost/tagged4.html</link>
+            <link>/tagged4.html</link>
             <description>Article with Technology tag (should be included)</description>
             <category>Technology</category>
             <content:encoded><![CDATA[<p>More tech content.</p>]]></content:encoded>

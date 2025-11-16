@@ -206,8 +206,9 @@ class Extractor:
             if date_selector:
                 date_elem = self.document.cssselect(date_selector)
                 if date_elem and len(date_elem) > 0:
-                    # Try to get datetime attribute first, then text
-                    result['date'] = date_elem[0].get('datetime') or date_elem[0].text_content().strip()
+                    # Prefer text content (human-readable) over datetime attribute
+                    text = date_elem[0].text_content().strip()
+                    result['date'] = text if text else date_elem[0].get('datetime')
 
             # Use fallback for missing metadata
             if not result['title'] or not result['author'] or not result['date']:
@@ -267,7 +268,7 @@ def parse_rss_feed(
     entries = feed.entries[:limit] if limit else feed.entries
 
     for entry in entries:
-        article = {'url': entry.link}
+        article = {'url': resolve_url(feed_url, entry.link)}
 
         if use_content_encoded and hasattr(entry, 'content'):
             # Extract content from feed

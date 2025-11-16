@@ -28,30 +28,30 @@ class PythonExecutor:
             # Create execution namespace with context variables
             namespace = context.copy()
 
-            # Execute the script
-            exec(script, namespace)
+            # Strategy 1: If script contains 'return', wrap in a function
+            if 'return' in script:
+                # Indent each line and wrap in a function
+                lines = script.split('\n')
+                indented_lines = [f"    {line}" if line.strip() else "" for line in lines]
+                wrapped_script = "def __gensi_user_script():\n" + "\n".join(indented_lines)
 
-            # Check if there's a return value
-            # The script should set a 'return' statement or we look for common patterns
-            if 'return' in namespace:
-                return namespace['return']
+                try:
+                    exec(wrapped_script, namespace)
+                    return namespace['__gensi_user_script']()
+                except SyntaxError:
+                    # If wrapping fails, fall through to other strategies
+                    pass
 
-            # Try to evaluate the script as an expression to get the last value
+            # Strategy 2: Try evaluating as expression (implicit return)
             try:
-                # This is a workaround: compile and exec, then check for implicit return
-                # Since we already exec'd, we need to parse for returns
-                # For simplicity, let's use a wrapper function approach
-                wrapped_script = f"def __gensi_user_script():\n"
-                for line in script.split('\n'):
-                    wrapped_script += f"    {line}\n"
+                return eval(script, namespace)
+            except (SyntaxError, TypeError):
+                # Not a simple expression
+                pass
 
-                wrapper_namespace = context.copy()
-                exec(wrapped_script, wrapper_namespace)
-                return wrapper_namespace['__gensi_user_script']()
-
-            except SyntaxError:
-                # Script doesn't have a return value
-                raise ValueError("Python script must return a value")
+            # Strategy 3: Execute as statements (no return value expected)
+            exec(script, namespace)
+            return None
 
         except Exception as e:
             raise Exception(f"Python script execution failed: {str(e)}") from e

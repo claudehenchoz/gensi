@@ -174,7 +174,7 @@ class EPUBBuilder:
 
         # Build table of contents
         toc = []
-        spine = ['nav']
+        spine = []
 
         for section in self.sections:
             for article in section['articles']:

@@ -8,7 +8,7 @@
 
         <item>
             <title>RSS Article 1</title>
-            <link>http://localhost/rss_article1.html</link>
+            <link>/rss_article1.html</link>
             <description>This is the first RSS article description</description>
             <pubDate>Mon, 15 Jan 2025 10:00:00 GMT</pubDate>
             <author>rss@example.com (RSS Author 1)</author>
@@ -20,7 +20,7 @@
 
         <item>
             <title>RSS Article 2</title>
-            <link>http://localhost/rss_article2.html</link>
+            <link>/rss_article2.html</link>
             <description>This is the second RSS article description</description>
             <pubDate>Tue, 16 Jan 2025 14:00:00 GMT</pubDate>
             <author>rss@example.com (RSS Author 2)</author>
@@ -35,7 +35,7 @@
 
         <item>
             <title>RSS Article 3</title>
-            <link>http://localhost/rss_article3.html</link>
+            <link>/rss_article3.html</link>
             <description>This is the third RSS article description (no content:encoded)</description>
             <pubDate>Wed, 17 Jan 2025 09:00:00 GMT</pubDate>
             <author>rss@example.com (RSS Author 3)</author>

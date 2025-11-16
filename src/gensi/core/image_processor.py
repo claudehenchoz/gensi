@@ -138,6 +138,13 @@ class ImageProcessor:
             for img in doc.xpath('//img'):
                 parent = img.getparent()
                 if parent is not None:
+                    # Preserve tail text (text after the img tag)
+                    if img.tail:
+                        prev = img.getprevious()
+                        if prev is not None:
+                            prev.tail = (prev.tail or '') + img.tail
+                        else:
+                            parent.text = (parent.text or '') + img.tail
                     parent.remove(img)
 
             return etree.tostring(doc, encoding='unicode', method='html')
