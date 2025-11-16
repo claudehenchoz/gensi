@@ -198,7 +198,7 @@ class EPUBBuilder:
 
         # Add navigation files
         self.book.add_item(epub.EpubNcx())
-        # Note: Not adding EpubNav explicitly - let ebooklib generate it
+        self.book.add_item(epub.EpubNav())
 
         # Write EPUB file
         # Use options to avoid issues with nav generation
