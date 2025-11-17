@@ -13,10 +13,11 @@
             {% if author or date %}
             <div class="article-meta">
                 {% if author %}<span class="author">by {{ author }}</span>{% endif %}
-                {% if date %}<span class="date">{{ date }}</span>{% endif %}
+                {% if date %}<br/><span class="date">{{ date }}</span>{% endif %}
             </div>
             {% endif %}
         </header>
+        <br/>
         {% endif %}
 
         <div class="article-content">
