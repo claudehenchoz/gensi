@@ -6,6 +6,8 @@ from ebooklib import epub
 from jinja2 import Environment, FileSystemLoader
 import uuid
 
+from gensi.utils.date_formatter import format_date
+
 
 class EPUBBuilder:
     """Builds EPUB files from processed articles."""
@@ -92,12 +94,15 @@ class EPUBBuilder:
             chapter_num = len(self.chapters) + 1
             filename = f'chapter_{chapter_num:03d}.xhtml'
 
+        # Format date for human-readable output
+        formatted_date = format_date(date, self.language) if date else None
+
         # Render article template
         template = self.jinja_env.get_template('article.xhtml.j2')
         article_html = template.render(
             title=title or 'Untitled',
             author=author,
-            date=date,
+            date=formatted_date,
             content=content,
             language=self.language
         )

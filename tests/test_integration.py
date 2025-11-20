@@ -616,3 +616,235 @@ images = true
             files = validator.list_files()
             assert 'mimetype' in files
             assert any('META-INF' in f for f in files)
+
+
+@pytest.mark.asyncio
+class TestDateFormatting:
+    """Test date formatting in different languages."""
+
+    async def test_date_formatting_english(self, temp_dir, httpserver_with_content):
+        """Test that dates are formatted in human-readable English."""
+        httpserver = httpserver_with_content
+
+        gensi_content = f"""
+title = "English Date Test"
+author = "Test Author"
+language = "en"
+
+[[index]]
+url = "{httpserver.url_for('/blog_index.html')}"
+type = "html"
+links = "article.post-preview a.post-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+author = "span.author"
+date = "time.published"
+"""
+        gensi_path = temp_dir / 'test_english_dates.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Validate the EPUB and check date formatting
+        with EPUBValidator(output_path) as validator:
+            # Get first article content
+            articles = validator.get_articles()
+            assert len(articles) > 0
+
+            first_article = articles[0]
+            # The date should be formatted in English
+            # Original: "2025-01-15T10:00:00Z" or "January 15, 2025"
+            # Should contain formatted date components
+            assert '2025' in first_article or '25' in first_article
+            assert ('Jan' in first_article or 'January' in first_article)
+
+    async def test_date_formatting_german(self, temp_dir, httpserver_with_content):
+        """Test that dates are formatted in human-readable German."""
+        httpserver = httpserver_with_content
+
+        gensi_content = f"""
+title = "German Date Test"
+author = "Test Author"
+language = "de"
+
+[[index]]
+url = "{httpserver.url_for('/blog_index.html')}"
+type = "html"
+links = "article.post-preview a.post-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+author = "span.author"
+date = "time.published"
+"""
+        gensi_path = temp_dir / 'test_german_dates.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Validate the EPUB and check date formatting
+        with EPUBValidator(output_path) as validator:
+            articles = validator.get_articles()
+            assert len(articles) > 0
+
+            first_article = articles[0]
+            # The date should be formatted in German format
+            # Should contain date in German locale format
+            assert '2025' in first_article or '25' in first_article
+            # German uses "Januar" for January
+            assert ('Jan' in first_article or 'Januar' in first_article or '15' in first_article)
+
+    async def test_date_formatting_with_iso_datetime(self, temp_dir, httpserver_with_content):
+        """Test formatting of ISO datetime strings."""
+        httpserver = httpserver_with_content
+
+        # Create a custom article with ISO datetime
+        custom_article_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ISO Date Article</title>
+</head>
+<body>
+    <article>
+        <h1 class="article-title">ISO Date Test</h1>
+        <div class="meta">
+            <span class="author">Test Author</span>
+            <time class="published" datetime="2025-03-20T14:30:00Z">2025-03-20T14:30:00Z</time>
+        </div>
+        <div class="article-content">
+            <p>This article tests ISO datetime formatting.</p>
+        </div>
+    </article>
+</body>
+</html>
+"""
+        # Serve custom article
+        httpserver.expect_request('/iso_article.html').respond_with_data(
+            custom_article_html,
+            content_type='text/html'
+        )
+
+        # Create index page
+        index_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <article class="post-preview">
+        <a class="post-link" href="{httpserver.url_for('/iso_article.html')}">ISO Article</a>
+    </article>
+</body>
+</html>
+"""
+        httpserver.expect_request('/iso_index.html').respond_with_data(
+            index_html,
+            content_type='text/html'
+        )
+
+        gensi_content = f"""
+title = "ISO DateTime Test"
+author = "Test Author"
+language = "en"
+
+[[index]]
+url = "{httpserver.url_for('/iso_index.html')}"
+type = "html"
+links = "article.post-preview a.post-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+date = "time.published"
+"""
+        gensi_path = temp_dir / 'test_iso_dates.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Check that the raw ISO datetime was formatted properly
+        with EPUBValidator(output_path) as validator:
+            articles = validator.get_articles()
+            assert len(articles) > 0
+
+            article_content = articles[0]
+            # Should NOT contain raw ISO format "2025-03-20T14:30:00Z"
+            # Should contain formatted date/time
+            assert '2025' in article_content or '25' in article_content
+            assert 'Mar' in article_content or 'March' in article_content
+            # Should include time since it's a datetime
+            assert ('14' in article_content or '2:30' in article_content or '30' in article_content)
+
+    async def test_unparseable_date_fallback(self, temp_dir, httpserver_with_content):
+        """Test that unparseable dates fall back to original string."""
+        httpserver = httpserver_with_content
+
+        # Create article with unparseable date
+        custom_article_html = """<!DOCTYPE html>
+<html>
+<body>
+    <article>
+        <h1 class="article-title">Unparseable Date Test</h1>
+        <time class="published">Not a real date format xyz123</time>
+        <div class="article-content">
+            <p>This article has an unparseable date.</p>
+        </div>
+    </article>
+</body>
+</html>
+"""
+        httpserver.expect_request('/unparseable_article.html').respond_with_data(
+            custom_article_html,
+            content_type='text/html'
+        )
+
+        index_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <article class="post-preview">
+        <a class="post-link" href="{httpserver.url_for('/unparseable_article.html')}">Article</a>
+    </article>
+</body>
+</html>
+"""
+        httpserver.expect_request('/unparseable_index.html').respond_with_data(
+            index_html,
+            content_type='text/html'
+        )
+
+        gensi_content = f"""
+title = "Unparseable Date Test"
+language = "en"
+
+[[index]]
+url = "{httpserver.url_for('/unparseable_index.html')}"
+type = "html"
+links = "article.post-preview a.post-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+date = "time.published"
+"""
+        gensi_path = temp_dir / 'test_unparseable.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Verify that the unparseable date is preserved as-is
+        with EPUBValidator(output_path) as validator:
+            articles = validator.get_articles()
+            assert len(articles) > 0
+
+            article_content = articles[0]
+            # Should contain the original unparseable string
+            assert 'Not a real date format xyz123' in article_content

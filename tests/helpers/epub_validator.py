@@ -227,6 +227,21 @@ class EPUBValidator:
                 count += 1
         return count
 
+    def get_articles(self) -> list[str]:
+        """Get list of all article contents from the EPUB spine."""
+        spine_items = self.get_spine_items()
+        manifest = self.get_manifest_items()
+
+        articles = []
+        for item_id in spine_items:
+            href = manifest.get(item_id)
+            if href:
+                content = self.get_chapter_content(href)
+                if content:
+                    articles.append(content)
+
+        return articles
+
 
 def validate_epub_structure(epub_path: Path) -> dict:
     """
