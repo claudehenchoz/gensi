@@ -116,6 +116,9 @@ class EPUBBuilder:
         # Use set_content() to properly encode the HTML
         chapter.set_content(article_html.encode('utf-8'))
 
+        # Add stylesheet link to the chapter's head section
+        chapter.add_link(href='../styles/styles.css', rel='stylesheet', type='text/css')
+
         # Add to book
         self.book.add_item(chapter)
         self.chapters.append(chapter)
@@ -201,9 +204,31 @@ class EPUBBuilder:
         self.book.toc = toc
         self.book.spine = spine
 
+        # Create custom navigation document using template
+        nav_template = self.jinja_env.get_template('nav.xhtml.j2')
+        nav_html = nav_template.render(
+            sections=self.sections,
+            language=self.language
+        )
+
+        # Create nav as EpubHtml item
+        nav = epub.EpubHtml(
+            title='Navigation',
+            file_name='nav.xhtml',
+            lang=self.language
+        )
+        nav.set_content(nav_html.encode('utf-8'))
+        nav.is_linear = False
+
+        # Mark as navigation document for EPUB3 readers
+        nav.properties.append('nav')
+
+        # Add stylesheet link to the nav's head section
+        nav.add_link(href='styles/styles.css', rel='stylesheet', type='text/css')
+
         # Add navigation files
         self.book.add_item(epub.EpubNcx())
-        self.book.add_item(epub.EpubNav())
+        self.book.add_item(nav)
 
         # Write EPUB file
         # Use options to avoid issues with nav generation

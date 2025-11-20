@@ -40,6 +40,7 @@ EPUB_ALLOWED_ATTRIBUTES = {
     'audio': {'src', 'controls', 'autoplay', 'loop', 'preload'},
     'video': {'src', 'controls', 'autoplay', 'loop', 'preload', 'width', 'height', 'poster'},
     'source': {'src', 'type'},
+    'link': {'rel', 'href', 'type'},
     'table': {'border', 'cellpadding', 'cellspacing', 'width', 'summary'},
     'td': {'colspan', 'rowspan', 'headers', 'width', 'height', 'align', 'valign'},
     'th': {'colspan', 'rowspan', 'scope', 'width', 'height', 'align', 'valign'},
