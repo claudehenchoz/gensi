@@ -247,3 +247,143 @@ class TestEPUBBuilderBuild:
                     assert chapter_content is not None
                     assert "test" in chapter_content
                     assert "formatting" in chapter_content
+
+
+class TestEPUBBuilderStylesheets:
+    """Test that stylesheet links are correctly included in EPUB files."""
+
+    def test_article_has_stylesheet_link(self, temp_dir):
+        """Test that article HTML contains stylesheet link."""
+        builder = EPUBBuilder("Stylesheet Test", "Author")
+        builder.add_section("Test")
+        builder.add_article(content="<p>Test content</p>", title="Test Article")
+
+        output_path = temp_dir / 'stylesheet_test.epub'
+        builder.build(output_path)
+
+        with EPUBValidator(output_path) as validator:
+            manifest = validator.get_manifest_items()
+            spine_items = validator.get_spine_items()
+
+            # Get first article
+            assert len(spine_items) > 0
+            first_id = spine_items[0]
+            first_href = manifest.get(first_id)
+            assert first_href is not None
+
+            chapter_content = validator.get_chapter_content(first_href)
+            assert chapter_content is not None
+
+            # Check for stylesheet link with correct attributes
+            assert '<link href="../styles/styles.css"' in chapter_content
+            assert 'rel="stylesheet"' in chapter_content
+            assert 'type="text/css"' in chapter_content
+
+    def test_nav_has_stylesheet_link(self, temp_dir):
+        """Test that nav document contains stylesheet link."""
+        builder = EPUBBuilder("Nav Stylesheet Test", "Author")
+        builder.add_section("Test")
+        builder.add_article(content="<p>Test content</p>", title="Test Article")
+
+        output_path = temp_dir / 'nav_stylesheet_test.epub'
+        builder.build(output_path)
+
+        with EPUBValidator(output_path) as validator:
+            # Find nav document
+            opf_path = validator.get_content_opf_path()
+            assert opf_path is not None
+
+            import zipfile
+            from lxml import etree
+            from pathlib import Path
+
+            content = validator.epub.read(opf_path)
+            tree = etree.fromstring(content)
+            ns = {'opf': 'http://www.idpf.org/2007/opf'}
+
+            # Find nav document
+            nav_items = tree.xpath(
+                '//opf:manifest/opf:item[@properties="nav"]/@href',
+                namespaces=ns
+            )
+            assert len(nav_items) > 0
+
+            nav_href = nav_items[0]
+            opf_dir = str(Path(opf_path).parent)
+            if opf_dir == '.':
+                nav_path = nav_href
+            else:
+                nav_path = f"{opf_dir}/{nav_href}"
+
+            nav_content = validator.epub.read(nav_path).decode('utf-8')
+
+            # Check for stylesheet link with correct attributes
+            assert '<link href="styles/styles.css"' in nav_content
+            assert 'rel="stylesheet"' in nav_content
+            assert 'type="text/css"' in nav_content
+
+    def test_multiple_articles_all_have_stylesheet_links(self, temp_dir):
+        """Test that all article HTML files contain stylesheet links."""
+        builder = EPUBBuilder("Multiple Articles Stylesheet Test", "Author")
+        builder.add_section("Test")
+
+        # Add multiple articles
+        for i in range(5):
+            builder.add_article(
+                content=f"<p>Article {i+1} content</p>",
+                title=f"Article {i+1}"
+            )
+
+        output_path = temp_dir / 'multi_articles_stylesheet.epub'
+        builder.build(output_path)
+
+        with EPUBValidator(output_path) as validator:
+            manifest = validator.get_manifest_items()
+            spine_items = validator.get_spine_items()
+
+            assert len(spine_items) == 5
+
+            # Check each article for stylesheet link
+            for item_id in spine_items:
+                href = manifest.get(item_id)
+                assert href is not None
+
+                chapter_content = validator.get_chapter_content(href)
+                assert chapter_content is not None
+
+                # Verify stylesheet link exists
+                assert '<link href="../styles/styles.css"' in chapter_content
+                assert 'rel="stylesheet"' in chapter_content
+                assert 'type="text/css"' in chapter_content
+
+    def test_multiple_sections_all_articles_have_stylesheet_links(self, temp_dir):
+        """Test that articles in multiple sections all have stylesheet links."""
+        builder = EPUBBuilder("Multi-Section Stylesheet Test", "Author")
+
+        # Section 1
+        builder.add_section("Section 1")
+        builder.add_article(content="<p>Section 1 Article 1</p>", title="S1A1")
+        builder.add_article(content="<p>Section 1 Article 2</p>", title="S1A2")
+
+        # Section 2
+        builder.add_section("Section 2")
+        builder.add_article(content="<p>Section 2 Article 1</p>", title="S2A1")
+        builder.add_article(content="<p>Section 2 Article 2</p>", title="S2A2")
+
+        output_path = temp_dir / 'multi_section_stylesheet.epub'
+        builder.build(output_path)
+
+        with EPUBValidator(output_path) as validator:
+            manifest = validator.get_manifest_items()
+            spine_items = validator.get_spine_items()
+
+            assert len(spine_items) == 4
+
+            # Check all articles have stylesheet links
+            for item_id in spine_items:
+                href = manifest.get(item_id)
+                chapter_content = validator.get_chapter_content(href)
+
+                assert '<link href="../styles/styles.css"' in chapter_content
+                assert 'rel="stylesheet"' in chapter_content
+                assert 'type="text/css"' in chapter_content

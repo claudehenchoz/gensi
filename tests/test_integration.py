@@ -848,3 +848,255 @@ date = "time.published"
             article_content = articles[0]
             # Should contain the original unparseable string
             assert 'Not a real date format xyz123' in article_content
+
+
+class TestStylesheetLinks:
+    """Test that stylesheet links are correctly included in generated EPUBs."""
+
+    @pytest.mark.asyncio
+    async def test_simple_gensi_has_stylesheet_links(self, temp_dir, httpserver):
+        """Test that articles from simple gensi have stylesheet links."""
+        # Setup test article
+        article_html = """<!DOCTYPE html>
+<html>
+<head><title>Test Article</title></head>
+<body>
+    <h1 class="article-title">Test Article</h1>
+    <div class="article-content">
+        <p>This is test content.</p>
+    </div>
+</body>
+</html>
+"""
+        httpserver.expect_request('/article.html').respond_with_data(
+            article_html,
+            content_type='text/html'
+        )
+
+        index_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <a class="article-link" href="{httpserver.url_for('/article.html')}">Test Article</a>
+</body>
+</html>
+"""
+        httpserver.expect_request('/index.html').respond_with_data(
+            index_html,
+            content_type='text/html'
+        )
+
+        gensi_content = f"""
+title = "Stylesheet Test EPUB"
+language = "en"
+
+[[index]]
+url = "{httpserver.url_for('/index.html')}"
+type = "html"
+links = "a.article-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+"""
+        gensi_path = temp_dir / 'stylesheet_test.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Verify article has stylesheet link
+        with EPUBValidator(output_path) as validator:
+            manifest = validator.get_manifest_items()
+            spine_items = validator.get_spine_items()
+
+            assert len(spine_items) > 0
+            first_id = spine_items[0]
+            first_href = manifest.get(first_id)
+            assert first_href is not None
+
+            chapter_content = validator.get_chapter_content(first_href)
+            assert chapter_content is not None
+
+            # Check for stylesheet link with correct attributes
+            assert '<link href="../styles/styles.css"' in chapter_content
+            assert 'rel="stylesheet"' in chapter_content
+            assert 'type="text/css"' in chapter_content
+
+    @pytest.mark.asyncio
+    async def test_nav_has_stylesheet_link_integration(self, temp_dir, httpserver):
+        """Test that nav document has stylesheet link in integration test."""
+        # Setup test article
+        article_html = """<!DOCTYPE html>
+<html>
+<head><title>Nav Test Article</title></head>
+<body>
+    <h1 class="article-title">Nav Test Article</h1>
+    <div class="article-content">
+        <p>Testing nav stylesheet.</p>
+    </div>
+</body>
+</html>
+"""
+        httpserver.expect_request('/article.html').respond_with_data(
+            article_html,
+            content_type='text/html'
+        )
+
+        index_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <a class="article-link" href="{httpserver.url_for('/article.html')}">Nav Test Article</a>
+</body>
+</html>
+"""
+        httpserver.expect_request('/index.html').respond_with_data(
+            index_html,
+            content_type='text/html'
+        )
+
+        gensi_content = f"""
+title = "Nav Stylesheet Test EPUB"
+language = "en"
+
+[[index]]
+url = "{httpserver.url_for('/index.html')}"
+type = "html"
+links = "a.article-link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+"""
+        gensi_path = temp_dir / 'nav_stylesheet_test.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Verify nav has stylesheet link
+        with EPUBValidator(output_path) as validator:
+            opf_path = validator.get_content_opf_path()
+            assert opf_path is not None
+
+            from lxml import etree
+            from pathlib import Path
+
+            content = validator.epub.read(opf_path)
+            tree = etree.fromstring(content)
+            ns = {'opf': 'http://www.idpf.org/2007/opf'}
+
+            # Find nav document
+            nav_items = tree.xpath(
+                '//opf:manifest/opf:item[@properties="nav"]/@href',
+                namespaces=ns
+            )
+            assert len(nav_items) > 0
+
+            nav_href = nav_items[0]
+            opf_dir = str(Path(opf_path).parent)
+            if opf_dir == '.':
+                nav_path = nav_href
+            else:
+                nav_path = f"{opf_dir}/{nav_href}"
+
+            nav_content = validator.epub.read(nav_path).decode('utf-8')
+
+            # Check for stylesheet link with correct attributes
+            assert '<link href="styles/styles.css"' in nav_content
+            assert 'rel="stylesheet"' in nav_content
+            assert 'type="text/css"' in nav_content
+
+    @pytest.mark.asyncio
+    async def test_multi_index_all_articles_have_stylesheet_links(self, temp_dir, httpserver):
+        """Test that all articles from multiple indices have stylesheet links."""
+        # Setup multiple articles
+        for i in [1, 2, 3]:
+            article_html = f"""<!DOCTYPE html>
+<html>
+<head><title>Article {i}</title></head>
+<body>
+    <h1 class="article-title">Article {i}</h1>
+    <div class="article-content">
+        <p>Article {i} content.</p>
+    </div>
+</body>
+</html>
+"""
+            httpserver.expect_request(f'/article{i}.html').respond_with_data(
+                article_html,
+                content_type='text/html'
+            )
+
+        index1_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <a class="link" href="{httpserver.url_for('/article1.html')}">Article 1</a>
+    <a class="link" href="{httpserver.url_for('/article2.html')}">Article 2</a>
+</body>
+</html>
+"""
+        httpserver.expect_request('/index1.html').respond_with_data(
+            index1_html,
+            content_type='text/html'
+        )
+
+        index2_html = f"""<!DOCTYPE html>
+<html>
+<body>
+    <a class="link" href="{httpserver.url_for('/article3.html')}">Article 3</a>
+</body>
+</html>
+"""
+        httpserver.expect_request('/index2.html').respond_with_data(
+            index2_html,
+            content_type='text/html'
+        )
+
+        gensi_content = f"""
+title = "Multi-Index Stylesheet Test"
+language = "en"
+
+[[index]]
+name = "Section 1"
+url = "{httpserver.url_for('/index1.html')}"
+type = "html"
+links = "a.link"
+
+[[index]]
+name = "Section 2"
+url = "{httpserver.url_for('/index2.html')}"
+type = "html"
+links = "a.link"
+
+[article]
+content = "div.article-content"
+title = "h1.article-title"
+"""
+        gensi_path = temp_dir / 'multi_index_stylesheet.gensi'
+        gensi_path.write_text(gensi_content)
+
+        output_path = await process_gensi_file(gensi_path, temp_dir)
+
+        assert output_path.exists()
+
+        # Verify all articles have stylesheet links
+        with EPUBValidator(output_path) as validator:
+            manifest = validator.get_manifest_items()
+            spine_items = validator.get_spine_items()
+
+            assert len(spine_items) == 3  # 2 from section 1, 1 from section 2
+
+            # Check all articles have stylesheet links
+            for item_id in spine_items:
+                href = manifest.get(item_id)
+                assert href is not None
+
+                chapter_content = validator.get_chapter_content(href)
+                assert chapter_content is not None
+
+                # Verify stylesheet link exists
+                assert '<link href="../styles/styles.css"' in chapter_content
+                assert 'rel="stylesheet"' in chapter_content
+                assert 'type="text/css"' in chapter_content
