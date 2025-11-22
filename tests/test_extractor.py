@@ -369,3 +369,186 @@ return articles
 
         # Should only get articles with Technology tag and without Sponsor
         assert len(articles) == 2  # Articles 1 and 4 from test_feed_with_tags.xml
+
+
+class TestURLTransformation:
+    """Test URL transformation functionality."""
+
+    def test_transform_url_simple_mode(self):
+        """Test URL transformation with pattern and template."""
+        extractor = Extractor("http://example.com/", "<html></html>")
+        transform_config = {
+            'pattern': r'/reportage/([^/]+)/',
+            'template': 'https://api.com/graphql?slug={1}'
+        }
+
+        url = "/reportage/test-article/"
+        transformed = extractor.transform_url(url, transform_config)
+
+        assert transformed == "https://api.com/graphql?slug=test-article"
+
+    def test_transform_url_multiple_groups(self):
+        """Test URL transformation with multiple captured groups."""
+        extractor = Extractor("http://example.com/", "<html></html>")
+        transform_config = {
+            'pattern': r'/(\d+)/([a-z-]+)/',
+            'template': 'https://api.com/articles?id={1}&slug={2}'
+        }
+
+        url = "/2024/my-article/"
+        transformed = extractor.transform_url(url, transform_config)
+
+        assert transformed == "https://api.com/articles?id=2024&slug=my-article"
+
+    def test_transform_url_no_match_returns_original(self):
+        """Test that unmatched URLs are returned unchanged."""
+        extractor = Extractor("http://example.com/", "<html></html>")
+        transform_config = {
+            'pattern': r'/article/([^/]+)/',
+            'template': 'https://api.com/article/{1}'
+        }
+
+        url = "/different/path/"
+        transformed = extractor.transform_url(url, transform_config)
+
+        assert transformed == "/different/path/"
+
+    def test_transform_url_python_mode(self):
+        """Test URL transformation with Python script."""
+        extractor = Extractor("http://example.com/", "<html></html>")
+        transform_config = {
+            'python': {
+                'script': '''
+import re
+match = re.search(r'/reportage/([^/]+)/', url)
+if match:
+    slug = match.group(1)
+    return f"https://api.com/graphql?slug={slug}"
+return url
+'''
+            }
+        }
+        executor = PythonExecutor()
+
+        url = "/reportage/test-article/"
+        transformed = extractor.transform_url(url, transform_config, executor)
+
+        assert transformed == "https://api.com/graphql?slug=test-article"
+
+
+class TestJSONIndexExtraction:
+    """Test JSON index extraction functionality."""
+
+    def test_extract_json_index_simple_mode(self):
+        """Test extracting articles from JSON index in simple mode."""
+        json_response = '''
+        {
+            "data": {
+                "magazin": {
+                    "content": "<div><a class='article-link' href='/article/first/'>First</a><a class='article-link' href='/article/second/'>Second</a></div>"
+                }
+            }
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'data.magazin.content',
+            'links': '.article-link'
+        }
+        extractor = Extractor("http://example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'http://example.com/article/first/'
+        assert articles[1]['url'] == 'http://example.com/article/second/'
+
+    def test_extract_json_index_with_python(self):
+        """Test extracting articles from JSON index with Python script."""
+        json_response = '''
+        {
+            "posts": [
+                {"id": 1, "permalink": "/post/first/"},
+                {"id": 2, "permalink": "/post/second/"}
+            ]
+        }
+        '''
+        config = {
+            'type': 'json',
+            'python': {
+                'script': '''
+articles = []
+for post in data['posts']:
+    articles.append({'url': post['permalink']})
+return articles
+'''
+            }
+        }
+        extractor = Extractor("http://example.com/", json_response, content_type='json', config=config)
+        executor = PythonExecutor()
+
+        articles = extractor.extract_index_articles(config, executor)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'http://example.com/post/first/'
+        assert articles[1]['url'] == 'http://example.com/post/second/'
+
+
+class TestJSONArticleExtraction:
+    """Test JSON article extraction functionality."""
+
+    def test_extract_article_from_json_string_path(self):
+        """Test extracting article content from JSON with string json_path."""
+        json_response = '''
+        {
+            "data": {
+                "reportage": {
+                    "title": "Test Article",
+                    "content": "<article><h1>Test Article</h1><p>Content here</p></article>"
+                }
+            }
+        }
+        '''
+        config = {
+            'response_type': 'json',
+            'json_path': 'data.reportage.content',
+            'content': 'article'
+        }
+        extractor = Extractor("http://example.com/article.json", json_response, content_type='json', config=config)
+
+        result = extractor.extract_article_content(config)
+
+        assert result['content'] is not None
+        assert '<h1>Test Article</h1>' in result['content']
+        assert '<p>Content here</p>' in result['content']
+
+    def test_extract_article_from_json_dict_path(self):
+        """Test extracting article content and metadata from JSON with dict json_path."""
+        json_response = '''
+        {
+            "data": {
+                "reportage": {
+                    "title": "Test Article",
+                    "author": "John Doe",
+                    "content": "<article><p>Content here</p></article>"
+                }
+            }
+        }
+        '''
+        config = {
+            'response_type': 'json',
+            'json_path': {
+                'content': 'data.reportage.content',
+                'title': 'data.reportage.title',
+                'author': 'data.reportage.author'
+            },
+            'content': 'article'
+        }
+        extractor = Extractor("http://example.com/article.json", json_response, content_type='json', config=config)
+
+        result = extractor.extract_article_content(config)
+
+        assert result['content'] is not None
+        assert '<p>Content here</p>' in result['content']
+        assert result['title'] == 'Test Article'
+        assert result['author'] == 'John Doe'

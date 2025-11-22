@@ -185,8 +185,38 @@ class GensiProcessor:
         if index_type == 'html':
             # Fetch HTML index (not cached due to context="index")
             html_content, final_url = await fetcher.fetch(index_url, context="index")
-            extractor = Extractor(final_url, html_content)
+
+            # Check if response is actually JSON
+            content_type = 'json' if index_config.get('response_type') == 'json' else 'html'
+            extractor = Extractor(final_url, html_content, content_type=content_type, config=index_config)
             articles = extractor.extract_index_articles(index_config, self.python_executor)
+
+            # Apply URL transformation if configured
+            if 'url_transform' in index_config:
+                for article in articles:
+                    article['url'] = extractor.transform_url(
+                        article['url'],
+                        index_config['url_transform'],
+                        self.python_executor
+                    )
+
+            return articles
+
+        elif index_type == 'json':
+            # Fetch JSON index (not cached due to context="index")
+            json_content, final_url = await fetcher.fetch(index_url, context="index")
+            extractor = Extractor(final_url, json_content, content_type='json', config=index_config)
+            articles = extractor.extract_index_articles(index_config, self.python_executor)
+
+            # Apply URL transformation if configured
+            if 'url_transform' in index_config:
+                for article in articles:
+                    article['url'] = extractor.transform_url(
+                        article['url'],
+                        index_config['url_transform'],
+                        self.python_executor
+                    )
+
             return articles
 
         elif index_type == 'rss':
@@ -237,11 +267,13 @@ class GensiProcessor:
 
         # Fetch article
         article_url = article_data['url']
-        html_content, final_url = await fetcher.fetch(article_url, context="article")
+        content, final_url = await fetcher.fetch(article_url, context="article")
 
         # Extract content
         if article_config:
-            extractor = Extractor(final_url, html_content)
+            # Determine content type
+            content_type = 'json' if article_config.get('response_type') == 'json' else 'html'
+            extractor = Extractor(final_url, content, content_type=content_type, config=article_config)
             extracted = extractor.extract_article_content(article_config, self.python_executor)
 
             # Sanitize content

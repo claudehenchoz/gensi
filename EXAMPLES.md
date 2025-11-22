@@ -26,7 +26,16 @@ This document provides comprehensive examples of `.gensi` files for various use 
    - [Python Article Extraction](#python-article-extraction)
    - [RSS Filtering with Python](#rss-filtering-with-python)
    - [Complex Python Logic](#complex-python-logic)
-6. [Real-World Examples](#real-world-examples)
+6. [JSON/GraphQL API Examples](#jsongraphql-api-examples)
+   - [Basic JSON Index](#basic-json-index)
+   - [JSON Article with Metadata](#json-article-with-metadata)
+   - [URL Transformation (Pattern/Template)](#url-transformation-patterntemplate)
+   - [URL Transformation (Python Mode)](#url-transformation-python-mode)
+   - [Complete GraphQL Example](#complete-graphql-example-reportagen-magazine)
+   - [REST API Example](#rest-api-example)
+   - [Simple vs Python Modes](#simple-vs-python-modes-comparison)
+   - [JSON Features Summary](#json-features-summary)
+7. [Real-World Examples](#real-world-examples)
    - [Online Magazine](#online-magazine)
    - [Blog with Images](#blog-with-images)
    - [Newsletter Archive](#newsletter-archive)
@@ -710,6 +719,368 @@ return {
 - Conditional logic based on article attributes
 - URL manipulation or filtering
 - Advanced HTML processing needs
+
+---
+
+## JSON/GraphQL API Examples
+
+Gensi supports extracting content from JSON and GraphQL APIs, making it easy to work with headless CMS systems, GraphQL endpoints, and REST APIs that return HTML content wrapped in JSON.
+
+### Basic JSON Index
+
+Extract HTML from a JSON response, then use CSS selectors as normal.
+
+```toml
+title = "JSON API EPUB"
+
+[[index]]
+url = "https://api.example.com/posts"
+type = "json"  # Indicates the response is JSON, not HTML
+json_path = "data.html"  # JSONPath to extract HTML from JSON
+links = "article a"  # CSS selector applied to the extracted HTML
+
+[article]
+content = "div.post-content"
+title = "h1.post-title"
+```
+
+**How it works:**
+1. Fetch JSON from `url`
+2. Extract HTML using `json_path` (e.g., `data.html` → `$.data.html`)
+3. Parse the extracted HTML
+4. Apply CSS selector (`links`) to find article links
+5. Process articles normally
+
+**When to use:** APIs that return HTML content wrapped in JSON responses.
+
+---
+
+### JSON Article with Metadata
+
+Extract both content and metadata directly from JSON responses.
+
+```toml
+title = "JSON Article EPUB"
+
+[[index]]
+url = "https://example.com/articles"
+type = "html"
+links = "article a"
+
+[article]
+response_type = "json"  # Articles return JSON, not HTML
+
+# Dict mode: Extract multiple fields from JSON
+[article.json_path]
+content = "data.article.body"      # HTML content
+title = "data.article.headline"    # Article title
+author = "data.article.author.name"  # Author name
+
+# Optional: Remove elements from the extracted HTML
+remove = ["figure", ".advertisement"]
+```
+
+**How it works:**
+1. Fetch article URLs from index
+2. Each article URL returns JSON
+3. Extract HTML content and metadata using `json_path` (dict mode)
+4. Parse HTML and apply `remove` selectors
+5. Use extracted metadata (title, author) directly
+
+**When to use:**
+- API returns structured JSON with content and metadata
+- Want to extract metadata from JSON instead of HTML parsing
+- Working with headless CMS or modern API-driven sites
+
+**JSONPath dict format:**
+- `content` key is required (must point to HTML)
+- `title`, `author`, `date` keys are optional
+- All paths are JSONPath expressions
+
+---
+
+### URL Transformation (Pattern/Template)
+
+Transform URLs extracted from HTML (e.g., convert page URLs to API URLs).
+
+```toml
+title = "API URL Transformation"
+
+[[index]]
+url = "https://example.com/graphql?query=..."
+type = "json"
+json_path = "data.posts.html"
+links = ".post-link"  # Extract links like "/article/my-post-123/"
+
+# Transform extracted URLs using regex pattern and template
+[index.url_transform]
+pattern = '/article/([^/]+)/'  # Regex to capture slug
+template = 'https://api.example.com/articles/{1}'  # {1} = first capture group
+
+[article]
+content = "div.article-body"
+```
+
+**How it works:**
+1. Extract HTML from JSON
+2. Find links with CSS selector (e.g., `/article/my-post-123/`)
+3. Apply regex `pattern` to extract parts (e.g., captures `my-post-123`)
+4. Build new URL with `template` using captured groups
+5. Result: `https://api.example.com/articles/my-post-123`
+
+**Pattern/Template syntax:**
+- `pattern`: Standard regex pattern (Python `re` module)
+- `template`: URL template with `{1}`, `{2}`, etc. for capture groups
+- `{1}` = first captured group, `{2}` = second, etc.
+
+**When to use:**
+- Convert web URLs to API URLs
+- Extract IDs/slugs from URLs and build API endpoints
+- Transform relative URLs to different absolute URLs
+
+**Example transformations:**
+```
+Pattern: '/posts/(\d+)/'
+Template: 'https://api.com/v1/post/{1}'
+Input: '/posts/123/' → Output: 'https://api.com/v1/post/123'
+
+Pattern: '/(\d{4})/(\d{2})/([^/]+)/'
+Template: 'https://blog.com/api/article?year={1}&month={2}&slug={3}'
+Input: '/2025/01/my-article/' → Output: 'https://blog.com/api/article?year=2025&month=01&slug=my-article'
+```
+
+---
+
+### URL Transformation (Python Mode)
+
+Use Python for complex URL transformations.
+
+```toml
+title = "Python URL Transform"
+
+[[index]]
+url = "https://example.com/articles"
+type = "html"
+links = ".article-link"
+
+# Python script for URL transformation
+[index.url_transform.python]
+script = '''
+import re
+import json
+from urllib.parse import quote
+
+# The "url" variable contains the extracted URL
+# Must return: transformed URL as a string
+
+# Extract slug from URL
+match = re.search(r'/article/([^/]+)/', url)
+if not match:
+    return url  # Return original if no match
+
+slug = match.group(1)
+
+# Build GraphQL query URL
+query = "query { article(slug: $slug) { content } }"
+variables = json.dumps({"slug": slug})
+
+return f"https://api.example.com/graphql?query={quote(query)}&variables={quote(variables)}"
+'''
+
+[article]
+response_type = "json"
+json_path = "data.article.content"
+content = "article"
+```
+
+**When to use:**
+- Complex URL manipulation (JSON encoding, URL encoding, etc.)
+- Building GraphQL query URLs
+- Conditional URL transformation logic
+- Need access to Python libraries (json, urllib, etc.)
+
+**Available variables:** `url` (string) - The extracted URL
+
+**Return format:** String - The transformed URL
+
+---
+
+### Complete GraphQL Example (Reportagen Magazine)
+
+Real-world example using GraphQL API with URL transformation.
+
+```toml
+title = "Reportagen #85 - November 2025"
+author = "Das Magazin für Reportagen"
+language = "de"
+
+[[index]]
+name = "Reportagen"
+# GraphQL query to get magazine issue with list of articles
+url = "https://content.reportagen.com/graphql?query=query%20GET_MAGAZINE_BY_SLUG(%24slug%3A%20ID!)%20%7B%0A%20%20magazin(id%3A%20%24slug%2C%20idType%3A%20SLUG)%20%7B%0A%20%20%20%20content(format%3A%20RENDERED)%0A%20%20%7D%0A%7D&operationName=GET_MAGAZINE_BY_SLUG&variables=%7B%22slug%22%3A%22reportagen-85%22%7D"
+type = "json"
+json_path = "data.magazin.content"  # Extract HTML from GraphQL response
+links = ".block-reportage-teaser__link"  # Find article links in HTML
+
+# Transform article URLs to GraphQL query URLs
+[index.url_transform]
+pattern = '/reportage/([^/]+)/'  # Extract slug from URL
+# Build GraphQL URL to fetch individual article
+template = 'https://content.reportagen.com/graphql?query=query%20GET_REPORTAGE_BY_SLUG(%24slug%3A%20ID!)%20%7B%0A%20%20reportage(id%3A%20%24slug%2C%20idType%3A%20SLUG)%20%7B%0A%20%20%20%20title%0A%20%20%20%20content%0A%20%20%7D%0A%7D&operationName=GET_REPORTAGE_BY_SLUG&variables=%7B%22slug%22%3A%22{1}%22%7D'
+
+[article]
+response_type = "json"  # Articles return JSON
+remove = ["figure"]  # Remove figure elements from content
+
+# Extract both content and title from GraphQL response
+[article.json_path]
+content = "data.reportage.content"
+title = "data.reportage.title"
+```
+
+**How it works:**
+1. Query GraphQL API for magazine issue → Returns JSON with HTML content
+2. Extract HTML from JSON using `json_path`
+3. Find article links in HTML using CSS selector
+4. Transform each link (e.g., `/reportage/slug/`) to GraphQL query URL
+5. Fetch each article from GraphQL API → Returns JSON
+6. Extract content and title from JSON
+7. Remove unwanted elements and build EPUB
+
+**Before this feature:** Required ~80 lines of complex Python code
+**With JSON support:** Just 19 lines of declarative TOML!
+
+---
+
+### REST API Example
+
+Working with a REST API that returns JSON with HTML content.
+
+```toml
+title = "REST API Articles"
+
+[[index]]
+url = "https://api.example.com/v1/articles?page=latest"
+type = "json"
+
+# Python mode for complex JSON parsing
+[index.python]
+script = '''
+# The "data" variable contains parsed JSON
+# Must return: list of dicts with "url" key
+
+articles = []
+for item in data['articles']:
+    # Build API URL for each article
+    article_id = item['id']
+    api_url = f"https://api.example.com/v1/articles/{article_id}"
+    articles.append({'url': api_url})
+
+return articles
+'''
+
+[article]
+response_type = "json"
+
+# Python mode for flexible JSON extraction
+[article.python]
+script = '''
+# The "data" variable contains parsed JSON response
+# Can return string (HTML) or dict with content + metadata
+
+article_data = data['article']
+
+return {
+    'content': article_data['body_html'],
+    'title': article_data['title'],
+    'author': article_data['author']['display_name'],
+    'date': article_data['published_at']
+}
+'''
+```
+
+**When to use:**
+- REST API with complex JSON structure
+- Need conditional logic for JSON parsing
+- URLs must be built programmatically
+- JSON structure varies between responses
+
+---
+
+### Simple vs Python Modes Comparison
+
+**Simple Mode (Declarative):**
+```toml
+[[index]]
+type = "json"
+json_path = "data.content"
+links = "article a"
+
+[article]
+response_type = "json"
+json_path = "data.article.body"
+```
+
+**Python Mode (Programmatic):**
+```toml
+[[index]]
+type = "json"
+
+[index.python]
+script = '''
+# Access via "data" variable
+for item in data['items']:
+    articles.append({'url': item['url']})
+return articles
+'''
+
+[article]
+response_type = "json"
+
+[article.python]
+script = '''
+# Access via "data" variable
+return {
+    'content': data['article']['html'],
+    'title': data['article']['title']
+}
+'''
+```
+
+**Use simple mode when:**
+- JSON structure is straightforward
+- JSONPath can express the extraction
+- No conditional logic needed
+
+**Use Python mode when:**
+- Complex JSON parsing required
+- Need conditional logic
+- Building URLs dynamically
+- JSON structure varies
+
+---
+
+### JSON Features Summary
+
+**Supported index types:**
+- `type = "html"` - Regular HTML pages
+- `type = "rss"` - RSS/Atom feeds
+- `type = "json"` - JSON responses with HTML
+
+**JSON extraction options:**
+- `json_path = "string"` - Extract HTML from JSON (simple mode)
+- `[index.python]` - Custom Python for JSON parsing
+- `response_type = "json"` - Mark articles as returning JSON
+
+**URL transformation:**
+- `[index.url_transform]` - Pattern/template or Python for URL modification
+- Useful for converting page URLs to API URLs
+- Supports regex capture groups and custom logic
+
+**Article JSON extraction:**
+- `json_path = "string"` - Extract only HTML content
+- `[article.json_path]` dict - Extract content + metadata
+- All relative URLs automatically resolved to absolute
 
 ---
 

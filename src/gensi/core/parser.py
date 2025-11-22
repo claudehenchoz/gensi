@@ -49,8 +49,8 @@ class GensiParser:
                 raise ValueError(f"Index {i}: 'url' is required")
             if 'type' not in index:
                 raise ValueError(f"Index {i}: 'type' is required")
-            if index['type'] not in ['html', 'rss']:
-                raise ValueError(f"Index {i}: 'type' must be 'html' or 'rss'")
+            if index['type'] not in ['html', 'rss', 'json']:
+                raise ValueError(f"Index {i}: 'type' must be 'html', 'rss', or 'json'")
 
             # Validate HTML index
             if index['type'] == 'html':
@@ -59,6 +59,42 @@ class GensiParser:
                     if 'links' not in index:
                         raise ValueError(f"Index {i}: 'links' is required for HTML type (CSS selector pointing to <a> elements)")
 
+                # If response_type is json, validate json_path
+                if index.get('response_type') == 'json':
+                    if 'python' not in index and 'json_path' not in index:
+                        raise ValueError(f"Index {i}: 'json_path' is required when response_type='json' in simple mode")
+
+            # Validate JSON index
+            elif index['type'] == 'json':
+                # JSON indices require either json_path+links or python override
+                if 'python' not in index:
+                    if 'json_path' not in index:
+                        raise ValueError(f"Index {i}: 'json_path' is required for JSON type in simple mode")
+                    if 'links' not in index:
+                        raise ValueError(f"Index {i}: 'links' is required for JSON type in simple mode (CSS selector for HTML extracted from JSON)")
+
+            # Validate url_transform section if present
+            if 'url_transform' in index:
+                transform = index['url_transform']
+                if not isinstance(transform, dict):
+                    raise ValueError(f"Index {i}: 'url_transform' must be a section")
+
+                # Check if using Python override or simple mode
+                has_python = 'python' in transform
+                has_pattern = 'pattern' in transform
+                has_template = 'template' in transform
+
+                if has_python:
+                    # Python mode: only python subsection is needed
+                    if has_pattern or has_template:
+                        raise ValueError(f"Index {i}: url_transform cannot have both 'python' and 'pattern'/'template'")
+                else:
+                    # Simple mode: both pattern and template are required
+                    if not has_pattern:
+                        raise ValueError(f"Index {i}: url_transform requires 'pattern' in simple mode")
+                    if not has_template:
+                        raise ValueError(f"Index {i}: url_transform requires 'template' in simple mode")
+
         # Validate cover section if present
         if 'cover' in self.data:
             if 'url' not in self.data['cover']:
@@ -66,9 +102,38 @@ class GensiParser:
 
         # Validate article section if present
         if 'article' in self.data:
+            article = self.data['article']
+
+            # Validate response_type if present
+            if 'response_type' in article:
+                if article['response_type'] not in ['html', 'json']:
+                    raise ValueError("Article: 'response_type' must be 'html' or 'json'")
+
+                # If response_type is json, validate json_path
+                if article['response_type'] == 'json':
+                    if 'python' not in article and 'json_path' not in article:
+                        raise ValueError("Article: 'json_path' is required when response_type='json' in simple mode")
+
+                    # Validate json_path format (can be string or dict)
+                    if 'json_path' in article:
+                        json_path = article['json_path']
+                        if isinstance(json_path, dict):
+                            # Dict mode: must have 'content' key, optional title/author/date
+                            if 'content' not in json_path:
+                                raise ValueError("Article: json_path dict must have 'content' key")
+                            # All values must be strings
+                            for key, value in json_path.items():
+                                if not isinstance(value, str):
+                                    raise ValueError(f"Article: json_path['{key}'] must be a string")
+                        elif not isinstance(json_path, str):
+                            raise ValueError("Article: 'json_path' must be a string or dict")
+
             # Check if using Python override or simple mode
-            if 'python' not in self.data['article']:
-                if 'content' not in self.data['article']:
+            # Note: if response_type='json' with json_path, content selector is not needed
+            # (content will be extracted from JSON)
+            if 'python' not in article:
+                is_json_mode = article.get('response_type') == 'json' and 'json_path' in article
+                if not is_json_mode and 'content' not in article:
                     raise ValueError("Article: 'content' selector is required in simple mode")
 
     @property

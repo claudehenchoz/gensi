@@ -3,24 +3,58 @@
 from typing import Any, Optional
 from lxml import html, etree
 import feedparser
-from ..utils.url_utils import resolve_url
+import re
+from ..utils.url_utils import resolve_url, resolve_urls_in_html
 from ..utils.metadata_fallback import extract_metadata_fallback
+from .json_utils import extract_json_path, extract_json_paths
 
 
 class Extractor:
-    """Extracts content from HTML using CSS selectors and Python scripts."""
+    """Extracts content from HTML and JSON using CSS selectors and Python scripts."""
 
-    def __init__(self, base_url: str, html_content: str):
+    def __init__(self, base_url: str, content: str, content_type: str = 'html', config: dict[str, Any] = None):
         """
         Initialize the extractor.
 
         Args:
             base_url: The base URL for resolving relative URLs
-            html_content: The HTML content to parse
+            content: The content to parse (HTML string or JSON string)
+            content_type: Type of content ('html' or 'json')
+            config: Optional configuration with json_path for JSON extraction
         """
         self.base_url = base_url
-        self.html_content = html_content
-        self.document = html.fromstring(html_content)
+        self.content = content
+        self.content_type = content_type
+        self.config = config or {}
+
+        if content_type == 'json':
+            # For JSON, extract HTML using json_path if available
+            if 'json_path' in self.config:
+                json_path = self.config['json_path']
+                # Check if json_path is a string (extract HTML only) or dict (multiple fields)
+                if isinstance(json_path, str):
+                    html_content = extract_json_path(content, json_path)
+                    self.html_content = html_content
+                    self.document = html.fromstring(html_content)
+                    self.json_data = None
+                else:
+                    # Dict mode - will be handled in extract_article_content
+                    # For now, just store the JSON data
+                    self.html_content = None
+                    self.document = None
+                    import json
+                    self.json_data = json.loads(content)
+            else:
+                # JSON mode without json_path - will be handled by Python override
+                self.html_content = None
+                self.document = None
+                import json
+                self.json_data = json.loads(content)
+        else:
+            # HTML mode
+            self.html_content = content
+            self.document = html.fromstring(content)
+            self.json_data = None
 
     def extract_cover_url(self, config: dict[str, Any], python_executor=None) -> Optional[str]:
         """
@@ -80,7 +114,8 @@ class Extractor:
         """
         # Check if using Python override
         if 'python' in config and python_executor:
-            result = python_executor.execute(config['python']['script'], {'document': self.document})
+            context = {'document': self.document} if self.document is not None else {'data': self.json_data}
+            result = python_executor.execute(config['python']['script'], context)
             if not isinstance(result, list):
                 raise TypeError(f"Index Python script must return list, got {type(result)}")
 
@@ -114,6 +149,51 @@ class Extractor:
 
         return articles
 
+    def transform_url(
+        self, url: str, transform_config: dict[str, Any], python_executor=None
+    ) -> str:
+        """
+        Transform a URL using pattern/template or Python script.
+
+        Args:
+            url: The URL to transform
+            transform_config: The url_transform configuration
+            python_executor: Python executor instance for running scripts
+
+        Returns:
+            The transformed URL
+        """
+        # Check if using Python override
+        if 'python' in transform_config and python_executor:
+            result = python_executor.execute(
+                transform_config['python']['script'],
+                {'url': url}
+            )
+            if not isinstance(result, str):
+                raise TypeError(f"URL transform Python script must return string, got {type(result)}")
+            return result
+
+        # Simple mode: pattern and template
+        pattern = transform_config.get('pattern')
+        template = transform_config.get('template')
+
+        if not pattern or not template:
+            raise ValueError("URL transform requires 'pattern' and 'template' in simple mode")
+
+        # Apply regex pattern
+        match = re.search(pattern, url)
+        if not match:
+            # If pattern doesn't match, return original URL
+            return url
+
+        # Replace placeholders in template with captured groups
+        # {1}, {2}, etc. are replaced with match groups
+        transformed = template
+        for i, group in enumerate(match.groups(), start=1):
+            transformed = transformed.replace(f'{{{i}}}', group)
+
+        return transformed
+
     def extract_article_content(
         self, config: dict[str, Any], python_executor=None
     ) -> dict[str, Optional[str]]:
@@ -134,9 +214,71 @@ class Extractor:
             'date': None
         }
 
+        # Handle JSON response type
+        if config.get('response_type') == 'json':
+            # Extract HTML (and optionally metadata) from JSON
+            if 'json_path' in config:
+                json_path = config['json_path']
+
+                if isinstance(json_path, str):
+                    # Simple path - extract HTML only
+                    html_content = extract_json_path(self.content, json_path)
+                    # Resolve relative URLs in the HTML content
+                    html_content = resolve_urls_in_html(html_content, self.base_url)
+                    # Update document for further processing
+                    self.html_content = html_content
+                    self.document = html.fromstring(html_content)
+                elif isinstance(json_path, dict):
+                    # Dict path - extract multiple fields
+                    extracted = extract_json_paths(self.content, json_path)
+
+                    # Extract and parse HTML content
+                    html_content = extracted['content']
+
+                    # Resolve relative URLs in the HTML content
+                    html_content = resolve_urls_in_html(html_content, self.base_url)
+
+                    self.html_content = html_content
+                    self.document = html.fromstring(html_content)
+
+                    # Store content directly (no need for CSS selectors)
+                    result['content'] = html_content
+
+                    # Extract metadata if provided
+                    if 'title' in extracted:
+                        result['title'] = extracted['title']
+                    if 'author' in extracted:
+                        result['author'] = extracted['author']
+                    if 'date' in extracted:
+                        result['date'] = extracted['date']
+
+                    # If we have content from JSON dict path, we can skip CSS selector processing
+                    # But still allow for 'remove' selectors to clean up the HTML
+                    if result['content'] and config.get('remove'):
+                        # Apply remove selectors to clean up the content
+                        remove_selectors = config.get('remove', [])
+                        for remove_sel in remove_selectors:
+                            for elem in self.document.cssselect(remove_sel):
+                                elem.getparent().remove(elem)
+                        # Update content after removal
+                        result['content'] = etree.tostring(self.document, encoding='unicode', method='html')
+
+                    # Use fallback for missing metadata
+                    if not result['title'] or not result['author'] or not result['date']:
+                        fallback = extract_metadata_fallback(self.document, self.base_url)
+                        if not result['title']:
+                            result['title'] = fallback['title']
+                        if not result['author']:
+                            result['author'] = fallback['author']
+                        if not result['date']:
+                            result['date'] = fallback['date']
+
+                    return result
+
         # Check if using Python override
         if 'python' in config and python_executor:
-            py_result = python_executor.execute(config['python']['script'], {'document': self.document})
+            context = {'document': self.document} if self.document is not None else {'data': self.json_data}
+            py_result = python_executor.execute(config['python']['script'], context)
 
             if isinstance(py_result, str):
                 # String return - just content
@@ -186,7 +328,13 @@ class Extractor:
                 for elem in content_elem.cssselect(remove_sel):
                     elem.getparent().remove(elem)
 
-            result['content'] = etree.tostring(content_elem, encoding='unicode', method='html')
+            # Extract HTML content
+            html_content = etree.tostring(content_elem, encoding='unicode', method='html')
+
+            # Resolve relative URLs in the HTML content
+            html_content = resolve_urls_in_html(html_content, self.base_url)
+
+            result['content'] = html_content
 
             # Extract metadata using selectors or fallback
             title_selector = config.get('title')

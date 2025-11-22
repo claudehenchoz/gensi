@@ -392,3 +392,347 @@ this is not valid TOML
         """Test that nonexistent file raises exception."""
         with pytest.raises(FileNotFoundError):
             GensiParser('nonexistent.gensi')
+
+
+class TestParserJsonSupport:
+    """Test parsing and validation of JSON-related fields."""
+
+    def test_valid_json_index_simple_mode(self, temp_dir):
+        """Test valid JSON index with json_path and links in simple mode."""
+        content = """
+title = "Test JSON EPUB"
+
+[[index]]
+url = "http://localhost/graphql"
+type = "json"
+json_path = "data.magazin.content"
+links = ".article-link"
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'json_index.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'json'
+        assert parser.indices[0]['json_path'] == 'data.magazin.content'
+        assert parser.indices[0]['links'] == '.article-link'
+
+    def test_valid_json_index_python_mode(self, temp_dir):
+        """Test valid JSON index with Python override (no json_path needed)."""
+        content = """
+title = "Test JSON EPUB"
+
+[[index]]
+url = "http://localhost/graphql"
+type = "json"
+
+[index.python]
+script = '''
+articles = []
+for item in data['items']:
+    articles.append({'url': item['url']})
+return articles
+'''
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'json_index_python.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'json'
+        assert 'python' in parser.indices[0]
+
+    def test_json_index_missing_json_path(self, temp_dir):
+        """Test that JSON index without json_path in simple mode raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/graphql"
+type = "json"
+links = ".article-link"
+"""
+        gensi_path = temp_dir / 'json_missing_path.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="json_path.*required.*JSON type"):
+            GensiParser(gensi_path)
+
+    def test_json_index_missing_links(self, temp_dir):
+        """Test that JSON index without links in simple mode raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/graphql"
+type = "json"
+json_path = "data.content"
+"""
+        gensi_path = temp_dir / 'json_missing_links.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="links.*required.*JSON type"):
+            GensiParser(gensi_path)
+
+    def test_valid_article_json_string_path(self, temp_dir):
+        """Test valid article with JSON response_type and string json_path."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[article]
+response_type = "json"
+json_path = "data.reportage.content"
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'article_json_string.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.article['response_type'] == 'json'
+        assert parser.article['json_path'] == 'data.reportage.content'
+
+    def test_valid_article_json_dict_path(self, temp_dir):
+        """Test valid article with JSON response_type and dict json_path."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[article]
+response_type = "json"
+
+[article.json_path]
+content = "data.reportage.content"
+title = "data.reportage.title"
+author = "data.reportage.author"
+"""
+        gensi_path = temp_dir / 'article_json_dict.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.article['response_type'] == 'json'
+        assert isinstance(parser.article['json_path'], dict)
+        assert parser.article['json_path']['content'] == 'data.reportage.content'
+        assert parser.article['json_path']['title'] == 'data.reportage.title'
+
+    def test_article_json_dict_missing_content(self, temp_dir):
+        """Test that article json_path dict without 'content' key raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[article]
+response_type = "json"
+
+[article.json_path]
+title = "data.title"
+"""
+        gensi_path = temp_dir / 'article_json_no_content.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="json_path dict must have 'content' key"):
+            GensiParser(gensi_path)
+
+    def test_article_invalid_response_type(self, temp_dir):
+        """Test that invalid response_type raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[article]
+response_type = "xml"
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'article_invalid_type.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="response_type.*must be.*html.*json"):
+            GensiParser(gensi_path)
+
+    def test_article_json_missing_json_path(self, temp_dir):
+        """Test that article with response_type='json' without json_path raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[article]
+response_type = "json"
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'article_json_no_path.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="json_path.*required.*response_type='json'"):
+            GensiParser(gensi_path)
+
+    def test_valid_url_transform_simple_mode(self, temp_dir):
+        """Test valid url_transform in simple mode with pattern and template."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/graphql"
+type = "json"
+json_path = "data.content"
+links = ".article-link"
+
+[index.url_transform]
+pattern = '/reportage/([^/]+)/'
+template = 'https://api.com/graphql?slug={1}'
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'url_transform_simple.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert 'url_transform' in parser.indices[0]
+        assert parser.indices[0]['url_transform']['pattern'] == '/reportage/([^/]+)/'
+        assert parser.indices[0]['url_transform']['template'] == 'https://api.com/graphql?slug={1}'
+
+    def test_valid_url_transform_python_mode(self, temp_dir):
+        """Test valid url_transform in Python mode."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[index.url_transform.python]
+script = '''
+import re
+match = re.search(r'/article/([^/]+)/', url)
+if match:
+    return f"https://api.com/article/{match.group(1)}"
+return url
+'''
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'url_transform_python.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert 'url_transform' in parser.indices[0]
+        assert 'python' in parser.indices[0]['url_transform']
+
+    def test_url_transform_missing_pattern(self, temp_dir):
+        """Test that url_transform without pattern in simple mode raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[index.url_transform]
+template = 'https://api.com/{1}'
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'url_transform_no_pattern.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="url_transform requires 'pattern'"):
+            GensiParser(gensi_path)
+
+    def test_url_transform_missing_template(self, temp_dir):
+        """Test that url_transform without template in simple mode raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[index.url_transform]
+pattern = '/article/([^/]+)/'
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'url_transform_no_template.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="url_transform requires 'template'"):
+            GensiParser(gensi_path)
+
+    def test_url_transform_mixed_modes_error(self, temp_dir):
+        """Test that url_transform with both Python and pattern/template raises error."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+links = "a"
+
+[index.url_transform]
+pattern = '/article/([^/]+)/'
+template = 'https://api.com/{1}'
+
+[index.url_transform.python]
+script = "return url"
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'url_transform_mixed.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="cannot have both 'python' and 'pattern'"):
+            GensiParser(gensi_path)
+
+    def test_html_index_with_response_type_json(self, temp_dir):
+        """Test HTML index with response_type='json' (fetch HTML, but it's actually JSON)."""
+        content = """
+title = "Test"
+
+[[index]]
+url = "http://localhost/index.html"
+type = "html"
+response_type = "json"
+json_path = "data.html"
+links = "a"
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'html_response_json.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'html'
+        assert parser.indices[0]['response_type'] == 'json'
+        assert parser.indices[0]['json_path'] == 'data.html'
