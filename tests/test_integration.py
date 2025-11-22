@@ -36,7 +36,7 @@ date = "time.published"
         gensi_path.write_text(gensi_content)
 
         # Process it
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         # Verify EPUB was created
         assert output_path.exists()
@@ -73,7 +73,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'with_cover.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -101,7 +101,7 @@ remove = [".sidebar"]
         gensi_path = temp_dir / 'remove.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -149,7 +149,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'multi_index.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -195,7 +195,7 @@ author = "span.author"
         gensi_path = temp_dir / 'override.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -228,7 +228,7 @@ content = "div.article-content"
         gensi_path = temp_dir / 'rss.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -255,7 +255,7 @@ content = "div.article-content"
         gensi_path = temp_dir / 'rss_limit.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -280,7 +280,7 @@ limit = 2
         gensi_path = temp_dir / 'rss_content.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -310,7 +310,7 @@ type = "rss"
         gensi_path = temp_dir / 'atom.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -350,7 +350,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'python_index.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -384,7 +384,7 @@ return {{
         gensi_path = temp_dir / 'python_article.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -415,7 +415,7 @@ content = "div.article-content"
         gensi_path = temp_dir / 'filtered_rss.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -449,7 +449,7 @@ images = true
         gensi_path = temp_dir / 'with_images.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -479,7 +479,7 @@ images = false
         gensi_path = temp_dir / 'no_images.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -513,7 +513,7 @@ content = "div.article-content"
         gensi_path.write_text(gensi_content)
 
         # Process with callback
-        processor = GensiProcessor(gensi_path, temp_dir, progress_callback)
+        processor = GensiProcessor(gensi_path, temp_dir, progress_callback, cache_enabled=False)
         output_path = await processor.process()
 
         assert output_path.exists()
@@ -546,7 +546,7 @@ content = "div.article-content"
         gensi_path.write_text(gensi_content)
 
         # Process with different parallel limits
-        processor = GensiProcessor(gensi_path, temp_dir, max_parallel=2)
+        processor = GensiProcessor(gensi_path, temp_dir, max_parallel=2, cache_enabled=False)
         output_path = await processor.process()
 
         assert output_path.exists()
@@ -593,7 +593,7 @@ images = true
         gensi_path = temp_dir / 'comprehensive.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -645,7 +645,7 @@ date = "time.published"
         gensi_path = temp_dir / 'test_english_dates.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -685,7 +685,7 @@ date = "time.published"
         gensi_path = temp_dir / 'test_german_dates.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -765,7 +765,7 @@ date = "time.published"
         gensi_path = temp_dir / 'test_iso_dates.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -836,7 +836,7 @@ date = "time.published"
         gensi_path = temp_dir / 'test_unparseable.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -901,7 +901,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'stylesheet_test.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -971,7 +971,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'nav_stylesheet_test.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 
@@ -1077,7 +1077,7 @@ title = "h1.article-title"
         gensi_path = temp_dir / 'multi_index_stylesheet.gensi'
         gensi_path.write_text(gensi_content)
 
-        output_path = await process_gensi_file(gensi_path, temp_dir)
+        output_path = await process_gensi_file(gensi_path, temp_dir, cache_enabled=False)
 
         assert output_path.exists()
 

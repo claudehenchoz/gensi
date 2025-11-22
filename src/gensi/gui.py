@@ -48,11 +48,12 @@ class ProcessorThread(QThread):
     finished_success = Signal(Path)
     finished_error = Signal(str)
 
-    def __init__(self, gensi_path: Path, output_dir: Path, max_parallel: int = 5):
+    def __init__(self, gensi_path: Path, output_dir: Path, max_parallel: int = 5, cache_enabled: bool = True):
         super().__init__()
         self.gensi_path = gensi_path
         self.output_dir = output_dir
         self.max_parallel = max_parallel
+        self.cache_enabled = cache_enabled
         self._stop_requested = False
 
     def run(self):
@@ -70,7 +71,8 @@ class ProcessorThread(QThread):
                 self.gensi_path,
                 self.output_dir,
                 progress_callback,
-                self.max_parallel
+                self.max_parallel,
+                self.cache_enabled
             )
             output_path = loop.run_until_complete(processor.process())
             loop.close()

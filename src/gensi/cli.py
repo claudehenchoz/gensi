@@ -40,7 +40,12 @@ def main(ctx):
     is_flag=True,
     help='Verbose output'
 )
-def process(files, output_dir, parallel, verbose):
+@click.option(
+    '--no-cache',
+    is_flag=True,
+    help='Disable HTTP caching for this run'
+)
+def process(files, output_dir, parallel, verbose, no_cache):
     """
     Process one or more .gensi files to generate EPUB files.
 
@@ -95,7 +100,8 @@ def process(files, output_dir, parallel, verbose):
                     gensi_path,
                     output_dir,
                     progress_callback,
-                    parallel
+                    parallel,
+                    cache_enabled=not no_cache
                 ))
 
                 console.print(f"[bold green]Success:[/bold green] {output_path}")
@@ -105,6 +111,25 @@ def process(files, output_dir, parallel, verbose):
                 if verbose:
                     console.print_exception()
                 sys.exit(1)
+
+
+@main.command()
+def clear_cache():
+    """Clear the HTTP cache."""
+    from .core.cache import HttpCache
+
+    try:
+        cache = HttpCache()
+        stats_before = cache.get_stats()
+        cache.clear()
+        cache.close()
+
+        console.print(f"[green]Cache cleared successfully![/green]")
+        console.print(f"  Removed {stats_before['entry_count']} entries")
+        console.print(f"  Freed {stats_before['size_bytes'] / 1024 / 1024:.2f} MB")
+    except Exception as e:
+        console.print(f"[red]Error clearing cache:[/red] {str(e)}")
+        sys.exit(1)
 
 
 @main.command()

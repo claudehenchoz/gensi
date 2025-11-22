@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from slugify import slugify
 
 from .parser import GensiParser
-from .fetcher import Fetcher
+from .cached_fetcher import CachedFetcher
 from .extractor import Extractor, parse_rss_feed
 from .sanitizer import Sanitizer
 from .python_executor import PythonExecutor
@@ -33,7 +33,8 @@ class GensiProcessor:
         gensi_path: Path | str,
         output_dir: Optional[Path | str] = None,
         progress_callback: Optional[Callable[[ProcessingProgress], None]] = None,
-        max_parallel: int = 5
+        max_parallel: int = 5,
+        cache_enabled: bool = True
     ):
         """
         Initialize the processor.
@@ -43,11 +44,13 @@ class GensiProcessor:
             output_dir: Output directory for the EPUB (default: same as .gensi file)
             progress_callback: Callback function for progress updates
             max_parallel: Maximum number of parallel downloads (default: 5)
+            cache_enabled: Whether to enable HTTP caching (default: True)
         """
         self.gensi_path = Path(gensi_path)
         self.output_dir = Path(output_dir) if output_dir else self.gensi_path.parent
         self.progress_callback = progress_callback
         self.max_parallel = max_parallel
+        self.cache_enabled = cache_enabled
 
         self.parser: Optional[GensiParser] = None
         self.sanitizer = Sanitizer()
@@ -83,7 +86,7 @@ class GensiProcessor:
             total_articles = 0
 
             # First pass: collect all articles
-            async with Fetcher() as fetcher:
+            async with CachedFetcher(cache_enabled=self.cache_enabled) as fetcher:
                 for i, index_config in enumerate(self.parser.indices):
                     # Use name if provided, otherwise None (for single index case)
                     section_name = index_config.get('name')
@@ -148,24 +151,24 @@ class GensiProcessor:
 
         self._report_progress('cover', message='Downloading cover image')
 
-        async with Fetcher() as fetcher:
+        async with CachedFetcher(cache_enabled=self.cache_enabled) as fetcher:
             # Fetch cover page/image
             cover_url = cover_config['url']
             from ..utils.url_utils import is_image_url
 
             if is_image_url(cover_url):
                 # Direct image URL
-                self.cover_data, _ = await fetcher.fetch_binary(cover_url)
+                self.cover_data, _ = await fetcher.fetch_binary(cover_url, context="cover")
             else:
                 # Page with image
-                html_content, final_url = await fetcher.fetch(cover_url)
+                html_content, final_url = await fetcher.fetch(cover_url, context="cover")
                 extractor = Extractor(final_url, html_content)
                 cover_img_url = extractor.extract_cover_url(cover_config, self.python_executor)
 
                 if cover_img_url:
-                    self.cover_data, _ = await fetcher.fetch_binary(cover_img_url)
+                    self.cover_data, _ = await fetcher.fetch_binary(cover_img_url, context="cover")
 
-    async def _process_index(self, fetcher: Fetcher, index_config: dict) -> list[dict]:
+    async def _process_index(self, fetcher: CachedFetcher, index_config: dict) -> list[dict]:
         """
         Process an index to extract article URLs.
 
@@ -180,15 +183,15 @@ class GensiProcessor:
         index_type = index_config['type']
 
         if index_type == 'html':
-            # Fetch HTML index
-            html_content, final_url = await fetcher.fetch(index_url)
+            # Fetch HTML index (not cached due to context="index")
+            html_content, final_url = await fetcher.fetch(index_url, context="index")
             extractor = Extractor(final_url, html_content)
             articles = extractor.extract_index_articles(index_config, self.python_executor)
             return articles
 
         elif index_type == 'rss':
-            # Fetch RSS/Atom feed
-            feed_content, final_url = await fetcher.fetch(index_url)
+            # Fetch RSS/Atom feed (not cached due to context="index")
+            feed_content, final_url = await fetcher.fetch(index_url, context="index")
             articles = parse_rss_feed(final_url, feed_content, index_config, self.python_executor)
             return articles
 
@@ -197,7 +200,7 @@ class GensiProcessor:
 
     async def _process_article(
         self,
-        fetcher: Fetcher,
+        fetcher: CachedFetcher,
         article_data: dict,
         article_config: Optional[dict]
     ) -> dict:
@@ -234,7 +237,7 @@ class GensiProcessor:
 
         # Fetch article
         article_url = article_data['url']
-        html_content, final_url = await fetcher.fetch(article_url)
+        html_content, final_url = await fetcher.fetch(article_url, context="article")
 
         # Extract content
         if article_config:
@@ -323,7 +326,8 @@ async def process_gensi_file(
     gensi_path: Path | str,
     output_dir: Optional[Path | str] = None,
     progress_callback: Optional[Callable[[ProcessingProgress], None]] = None,
-    max_parallel: int = 5
+    max_parallel: int = 5,
+    cache_enabled: bool = True
 ) -> Path:
     """
     Convenience function to process a .gensi file.
@@ -333,9 +337,10 @@ async def process_gensi_file(
         output_dir: Output directory for the EPUB
         progress_callback: Callback function for progress updates
         max_parallel: Maximum number of parallel downloads
+        cache_enabled: Whether to enable HTTP caching (default: True)
 
     Returns:
         Path to the generated EPUB file
     """
-    processor = GensiProcessor(gensi_path, output_dir, progress_callback, max_parallel)
+    processor = GensiProcessor(gensi_path, output_dir, progress_callback, max_parallel, cache_enabled)
     return await processor.process()

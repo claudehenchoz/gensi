@@ -202,7 +202,7 @@ class ImageProcessor:
 
             try:
                 # Download image
-                image_data, _ = await fetcher.fetch_binary(url)
+                image_data, _ = await fetcher.fetch_binary(url, context="image")
 
                 # Generate filename
                 filename = self.get_image_filename(url, i)

@@ -30,6 +30,10 @@ uv run gensi-gui
 # CLI - process .gensi files
 uv run gensi process <file.gensi>
 uv run gensi process *.gensi --output-dir ./output --parallel 10 --verbose
+
+# Cache management
+uv run gensi process <file.gensi> --no-cache  # Disable caching for this run
+uv run gensi clear-cache                       # Clear all cached data
 ```
 
 ### Testing and Code Quality
@@ -52,13 +56,14 @@ uv run ruff check src/
 The architecture follows a clean pipeline pattern:
 
 1. **Parser** (`core/parser.py`) - Parses and validates `.gensi` TOML files
-2. **Fetcher** (`core/fetcher.py`) - HTTP client using curl_cffi with chrome136 impersonation
-3. **Extractor** (`core/extractor.py`) - Extracts content using lxml CSS selectors or Python scripts
-4. **Sanitizer** (`core/sanitizer.py`) - Sanitizes HTML with nh3 for EPUB compliance
-5. **Typography** (`core/typography.py`) - Improves typography using typogrify
-6. **Image Processor** (`core/image_processor.py`) - Downloads and embeds images
-7. **EPUB Builder** (`core/epub_builder.py`) - Assembles EPUB using ebooklib and Jinja2 templates
-8. **Processor** (`core/processor.py`) - Main orchestrator that coordinates the pipeline
+2. **Cache** (`core/cache.py`) - Disk-based HTTP cache with 7-day TTL
+3. **Fetcher** (`core/fetcher.py` + `core/cached_fetcher.py`) - HTTP client using curl_cffi with chrome136 impersonation, wrapped with intelligent caching
+4. **Extractor** (`core/extractor.py`) - Extracts content using lxml CSS selectors or Python scripts
+5. **Sanitizer** (`core/sanitizer.py`) - Sanitizes HTML with nh3 for EPUB compliance
+6. **Typography** (`core/typography.py`) - Improves typography using typogrify
+7. **Image Processor** (`core/image_processor.py`) - Downloads and embeds images
+8. **EPUB Builder** (`core/epub_builder.py`) - Assembles EPUB using ebooklib and Jinja2 templates
+9. **Processor** (`core/processor.py`) - Main orchestrator that coordinates the pipeline
 
 ### Key Design Patterns
 
@@ -75,6 +80,13 @@ Python scripts run in `core/python_executor.py` with restricted context (only `d
 - Each index can override the global `[article]` extraction config
 - Single index = flat structure; multiple indices = sectioned EPUB
 
+**HTTP Caching**: Intelligent disk-based caching reduces network requests during development and recipe creation:
+- **Cached**: Article HTML, images, cover images (7-day TTL)
+- **Not cached**: Index pages and RSS/Atom feeds (always fetched fresh)
+- **Storage**: System cache directory (e.g., `~/.cache/gensi/http_cache` on Linux, `%LOCALAPPDATA%\gensi\cache` on Windows)
+- **Control**: `--no-cache` flag to disable caching, `gensi clear-cache` command to clear all cached data
+- **Implementation**: `CachedFetcher` wraps `Fetcher` with context-aware caching logic in `core/cached_fetcher.py`
+
 ### File Organization
 
 ```
@@ -83,7 +95,9 @@ src/gensi/
 ├── gui.py              # PySide6 GUI with queue-based interface
 ├── core/               # Core business logic (no UI dependencies)
 │   ├── parser.py       # TOML parsing and validation
+│   ├── cache.py        # HTTP response caching with TTL
 │   ├── fetcher.py      # HTTP client wrapper
+│   ├── cached_fetcher.py # Cached HTTP client with context-aware caching
 │   ├── extractor.py    # Content extraction logic
 │   ├── sanitizer.py    # HTML sanitization
 │   ├── typography.py   # Typography improvements
