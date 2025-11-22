@@ -252,17 +252,8 @@ class Extractor:
                     if 'date' in extracted:
                         result['date'] = extracted['date']
 
-                    # Apply remove selectors to clean up the HTML
-                    if result['content'] and config.get('remove'):
-                        remove_selectors = config.get('remove', [])
-                        for remove_sel in remove_selectors:
-                            for elem in self.document.cssselect(remove_sel):
-                                elem.getparent().remove(elem)
-                        # Update content after removal
-                        result['content'] = etree.tostring(self.document, encoding='unicode', method='html')
-
-                    # Extract metadata from CSS selectors if not provided by JSON
-                    # This allows mixing JSON and CSS selector extraction
+                    # Extract metadata from CSS selectors BEFORE removing elements
+                    # This allows extracting metadata from elements that will be removed
                     title_selector = config.get('title')
                     author_selector = config.get('author')
                     date_selector = config.get('date')
@@ -285,6 +276,16 @@ class Extractor:
                             if not date_text and date_elems[0].get('datetime'):
                                 date_text = date_elems[0].get('datetime')
                             result['date'] = date_text
+
+                    # NOW apply remove selectors to clean up the HTML
+                    # This happens AFTER metadata extraction so we can extract from elements we'll remove
+                    if result['content'] and config.get('remove'):
+                        remove_selectors = config.get('remove', [])
+                        for remove_sel in remove_selectors:
+                            for elem in self.document.cssselect(remove_sel):
+                                elem.getparent().remove(elem)
+                        # Update content after removal
+                        result['content'] = etree.tostring(self.document, encoding='unicode', method='html')
 
                     # Use fallback for still-missing metadata
                     if not result['title'] or not result['author'] or not result['date']:

@@ -584,3 +584,37 @@ class TestJSONArticleExtraction:
         assert result['title'] == 'Test Article from JSON'  # From JSON
         assert result['author'] == 'Jane Doe'  # From CSS selector
         assert result['date'] == '2025-01-15'  # From CSS selector
+
+    def test_extract_article_json_metadata_from_removed_element(self):
+        """Test extracting metadata from elements that will be removed."""
+        json_response = '''
+        {
+            "data": {
+                "reportage": {
+                    "title": "Test Article",
+                    "content": "<article><div class='title-lead'><h1>Test Article</h1><p class='byline'><a class='author'>John Doe</a></p></div><p>Article content here</p></article>"
+                }
+            }
+        }
+        '''
+        config = {
+            'response_type': 'json',
+            'json_path': {
+                'content': 'data.reportage.content',
+                'title': 'data.reportage.title'
+            },
+            'author': 'a.author',  # Extract author from element that will be removed
+            'remove': [
+                'div.title-lead',  # Remove the div containing the author
+            ]
+        }
+        extractor = Extractor("http://example.com/article.json", json_response, content_type='json', config=config)
+
+        result = extractor.extract_article_content(config)
+
+        assert result['content'] is not None
+        # Author should be extracted even though the element is removed
+        assert result['author'] == 'John Doe'
+        # Title-lead div should be removed from content
+        assert 'title-lead' not in result['content']
+        assert 'Article content here' in result['content']

@@ -848,7 +848,19 @@ title = "data.reportage.title"  # Title from JSON
 2. **CSS selector second:** If not in JSON, use CSS selector from `[article]`
 3. **Fallback third:** If neither, use HTML meta tag fallback
 
-**Example use case:** Reportagen magazine provides title in JSON but author links are embedded in the HTML content.
+**Processing order (important!):**
+1. Extract content from JSON
+2. Parse HTML content
+3. **Extract metadata with CSS selectors** (happens first!)
+4. **Remove elements** (happens second!)
+
+This means you can safely extract metadata from elements you're about to remove. For example:
+```toml
+author = "a.author"  # Extract author first
+remove = ["div.title-lead"]  # Then remove the div containing it
+```
+
+**Example use case:** Reportagen magazine provides title in JSON but author links are embedded in the HTML content, specifically in a title section that should be removed from the final article.
 
 ---
 
