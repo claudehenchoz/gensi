@@ -244,7 +244,7 @@ class Extractor:
                     # Store content directly (no need for CSS selectors)
                     result['content'] = html_content
 
-                    # Extract metadata if provided
+                    # Extract metadata from JSON (if provided in json_path)
                     if 'title' in extracted:
                         result['title'] = extracted['title']
                     if 'author' in extracted:
@@ -252,10 +252,8 @@ class Extractor:
                     if 'date' in extracted:
                         result['date'] = extracted['date']
 
-                    # If we have content from JSON dict path, we can skip CSS selector processing
-                    # But still allow for 'remove' selectors to clean up the HTML
+                    # Apply remove selectors to clean up the HTML
                     if result['content'] and config.get('remove'):
-                        # Apply remove selectors to clean up the content
                         remove_selectors = config.get('remove', [])
                         for remove_sel in remove_selectors:
                             for elem in self.document.cssselect(remove_sel):
@@ -263,7 +261,32 @@ class Extractor:
                         # Update content after removal
                         result['content'] = etree.tostring(self.document, encoding='unicode', method='html')
 
-                    # Use fallback for missing metadata
+                    # Extract metadata from CSS selectors if not provided by JSON
+                    # This allows mixing JSON and CSS selector extraction
+                    title_selector = config.get('title')
+                    author_selector = config.get('author')
+                    date_selector = config.get('date')
+
+                    # Apply CSS selectors for metadata not extracted from JSON
+                    if not result['title'] and title_selector:
+                        title_elems = self.document.cssselect(title_selector)
+                        if title_elems:
+                            result['title'] = title_elems[0].text_content().strip()
+
+                    if not result['author'] and author_selector:
+                        author_elems = self.document.cssselect(author_selector)
+                        if author_elems:
+                            result['author'] = author_elems[0].text_content().strip()
+
+                    if not result['date'] and date_selector:
+                        date_elems = self.document.cssselect(date_selector)
+                        if date_elems:
+                            date_text = date_elems[0].text_content().strip()
+                            if not date_text and date_elems[0].get('datetime'):
+                                date_text = date_elems[0].get('datetime')
+                            result['date'] = date_text
+
+                    # Use fallback for still-missing metadata
                     if not result['title'] or not result['author'] or not result['date']:
                         fallback = extract_metadata_fallback(self.document, self.base_url)
                         if not result['title']:

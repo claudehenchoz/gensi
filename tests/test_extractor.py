@@ -552,3 +552,35 @@ class TestJSONArticleExtraction:
         assert '<p>Content here</p>' in result['content']
         assert result['title'] == 'Test Article'
         assert result['author'] == 'John Doe'
+
+    def test_extract_article_json_mixed_extraction(self):
+        """Test mixing JSON extraction and CSS selectors for metadata."""
+        json_response = '''
+        {
+            "data": {
+                "reportage": {
+                    "title": "Test Article from JSON",
+                    "content": "<article><p>Content here</p><a class='author'>Jane Doe</a><time>2025-01-15</time></article>"
+                }
+            }
+        }
+        '''
+        config = {
+            'response_type': 'json',
+            'json_path': {
+                'content': 'data.reportage.content',
+                'title': 'data.reportage.title'
+                # Note: author is NOT in json_path
+            },
+            'author': 'a.author',  # CSS selector for author
+            'date': 'time',  # CSS selector for date
+        }
+        extractor = Extractor("http://example.com/article.json", json_response, content_type='json', config=config)
+
+        result = extractor.extract_article_content(config)
+
+        assert result['content'] is not None
+        assert '<p>Content here</p>' in result['content']
+        assert result['title'] == 'Test Article from JSON'  # From JSON
+        assert result['author'] == 'Jane Doe'  # From CSS selector
+        assert result['date'] == '2025-01-15'  # From CSS selector

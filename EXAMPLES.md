@@ -29,6 +29,7 @@ This document provides comprehensive examples of `.gensi` files for various use 
 6. [JSON/GraphQL API Examples](#jsongraphql-api-examples)
    - [Basic JSON Index](#basic-json-index)
    - [JSON Article with Metadata](#json-article-with-metadata)
+   - [Mixed JSON and CSS Extraction](#mixed-json-and-css-extraction)
    - [URL Transformation (Pattern/Template)](#url-transformation-patterntemplate)
    - [URL Transformation (Python Mode)](#url-transformation-python-mode)
    - [Complete GraphQL Example](#complete-graphql-example-reportagen-magazine)
@@ -796,6 +797,58 @@ remove = ["figure", ".advertisement"]
 - `content` key is required (must point to HTML)
 - `title`, `author`, `date` keys are optional
 - All paths are JSONPath expressions
+
+---
+
+### Mixed JSON and CSS Extraction
+
+Mix JSON extraction for some fields and CSS selectors for others.
+
+```toml
+title = "Mixed Extraction EPUB"
+
+[[index]]
+url = "https://example.com/articles"
+type = "html"
+links = "article a"
+
+[article]
+response_type = "json"
+# CSS selectors for metadata in the extracted HTML
+author = "a.author"  # Extract author from HTML using CSS selector
+date = "time.published"  # Extract date from HTML using CSS selector
+
+# Remove unwanted elements from HTML
+remove = [
+    "div.title-lead h1",
+    "div.title-lead p.byline",
+]
+
+# Extract from JSON
+[article.json_path]
+content = "data.reportage.content"  # HTML content from JSON
+title = "data.reportage.title"  # Title from JSON
+```
+
+**How it works:**
+1. Fetch article URL (returns JSON)
+2. Extract `content` and `title` from JSON using `json_path`
+3. Parse the HTML content
+4. Apply `remove` selectors to clean up HTML
+5. Extract `author` from HTML using CSS selector `a.author`
+6. Extract `date` from HTML using CSS selector `time.published`
+
+**When to use:**
+- Some metadata is in JSON, some is in the HTML content
+- Want flexibility to mix JSON and HTML extraction
+- API provides partial metadata, rest is in HTML
+
+**Extraction priority:**
+1. **JSON first:** If field is in `json_path` dict, use that value
+2. **CSS selector second:** If not in JSON, use CSS selector from `[article]`
+3. **Fallback third:** If neither, use HTML meta tag fallback
+
+**Example use case:** Reportagen magazine provides title in JSON but author links are embedded in the HTML content.
 
 ---
 
