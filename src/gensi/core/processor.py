@@ -14,6 +14,7 @@ from .python_executor import PythonExecutor
 from .epub_builder import EPUBBuilder
 from .image_processor import process_article_images
 from .typography import improve_typography
+from .replacements import apply_replacements
 
 
 @dataclass
@@ -250,6 +251,8 @@ class GensiProcessor:
             sanitized_content = self.sanitizer.sanitize(article_data['content'])
             # Improve typography
             sanitized_content = improve_typography(sanitized_content)
+            # Apply replacements
+            sanitized_content = apply_replacements(sanitized_content, self.parser.replacements)
             # Process images (check config for images setting, default to True)
             article_url = article_data['url']
             enable_images = article_config.get('images', True) if article_config else True
@@ -290,6 +293,9 @@ class GensiProcessor:
 
                 # Improve typography
                 sanitized = improve_typography(sanitized)
+
+                # Apply replacements
+                sanitized = apply_replacements(sanitized, self.parser.replacements)
 
                 # Process images (download and update references)
                 enable_images = article_config.get('images', True) if article_config else True

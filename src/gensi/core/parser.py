@@ -136,6 +136,28 @@ class GensiParser:
                 if not is_json_mode and 'content' not in article:
                     raise ValueError("Article: 'content' selector is required in simple mode")
 
+        # Validate replacements section if present
+        if 'replacements' in self.data:
+            replacements = self.data['replacements']
+            if not isinstance(replacements, list):
+                raise ValueError("'replacements' must be a list of [[replacements]] sections")
+
+            for i, replacement in enumerate(replacements):
+                if 'pattern' not in replacement:
+                    raise ValueError(f"Replacement {i}: 'pattern' is required")
+                if 'replacement' not in replacement:
+                    raise ValueError(f"Replacement {i}: 'replacement' is required")
+                if 'regex' not in replacement:
+                    raise ValueError(f"Replacement {i}: 'regex' is required (must be true or false)")
+
+                # Validate types
+                if not isinstance(replacement['pattern'], str):
+                    raise ValueError(f"Replacement {i}: 'pattern' must be a string")
+                if not isinstance(replacement['replacement'], str):
+                    raise ValueError(f"Replacement {i}: 'replacement' must be a string")
+                if not isinstance(replacement['regex'], bool):
+                    raise ValueError(f"Replacement {i}: 'regex' must be a boolean (true or false)")
+
     @property
     def title(self) -> str:
         """Get the EPUB title."""
@@ -179,3 +201,8 @@ class GensiParser:
             The article configuration to use, or None
         """
         return index_data.get('article', self.article)
+
+    @property
+    def replacements(self) -> list[dict[str, Any]]:
+        """Get the list of replacement configurations."""
+        return self.data.get('replacements', [])
