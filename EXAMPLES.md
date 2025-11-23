@@ -20,6 +20,7 @@ This document provides comprehensive examples of `.gensi` files for various use 
 4. [Advanced Extraction](#advanced-extraction)
    - [Element Removal](#element-removal)
    - [Image Control](#image-control)
+   - [Content Replacements](#content-replacements)
    - [Complete Metadata](#complete-metadata)
 5. [Python Script Examples](#python-script-examples)
    - [Python Index Extraction](#python-index-extraction)
@@ -441,6 +442,137 @@ images = true
 - EPUB file size
 - Processing time
 - Network bandwidth usage
+
+---
+
+### Content Replacements
+
+Apply search/replace transformations to article content after extraction. Replacements are applied after sanitization and typography improvements, but before image processing.
+
+```toml
+title = "Content with Replacements"
+
+[[index]]
+url = "https://example.com/articles"
+type = "html"
+links = "article a"
+
+[article]
+content = "div.article-content"
+title = "h1"
+
+# Replace section separators with horizontal rules
+[[replacements]]
+pattern = '<p class="separator">• • • •</p>'
+replacement = '<hr/>'
+regex = false  # Literal string replacement
+
+# Replace any paragraph with bullets/spaces with HR (regex)
+[[replacements]]
+pattern = '<p class="separator">[•\s]+</p>'
+replacement = '<hr/>'
+regex = true  # Use regex matching
+
+# Convert callout divs to semantic aside elements
+[[replacements]]
+pattern = '<div class="callout">(.*?)</div>'
+replacement = '<aside class="callout">\1</aside>'
+regex = true  # \1 refers to first capture group
+```
+
+**How it works:**
+1. Fetch and extract article content
+2. Sanitize HTML (remove dangerous elements)
+3. Improve typography (smart quotes, dashes, etc.)
+4. **Apply replacements in order** (each replacement sees the result of previous ones)
+5. Process images
+6. Build EPUB
+
+**When to use:**
+- Converting decorative elements to semantic HTML (e.g., `<div>` → `<aside>`)
+- Replacing custom separator patterns with standard HR elements
+- Cleaning up site-specific markup patterns
+- Transforming elements that the sanitizer doesn't handle
+
+**Literal vs Regex:**
+- **Literal (`regex = false`):** Exact string match, safe for special characters
+- **Regex (`regex = true`):** Pattern matching with capture groups
+
+**Common use cases:**
+
+**Example 1: Remove decorative separators**
+```toml
+[[replacements]]
+pattern = '<p class="center">* * *</p>'
+replacement = '<hr/>'
+regex = false
+```
+
+**Example 2: Normalize inconsistent separators**
+```toml
+# Matches any combination of bullets, asterisks, and spaces
+[[replacements]]
+pattern = '<p class="separator">[•*\s]+</p>'
+replacement = '<hr/>'
+regex = true
+```
+
+**Example 3: Convert custom elements to semantic HTML**
+```toml
+# Convert <div class="note"> to <aside class="note">
+[[replacements]]
+pattern = '<div class="note">(.*?)</div>'
+replacement = '<aside class="note">\1</aside>'
+regex = true
+```
+
+**Example 4: Remove specific text patterns**
+```toml
+# Remove "Continue reading..." links
+[[replacements]]
+pattern = '<p><a href="[^"]*">Continue reading.*?</a></p>'
+replacement = ''
+regex = true
+```
+
+**Example 5: Fix malformed HTML**
+```toml
+# Fix unclosed tags from a specific site
+[[replacements]]
+pattern = '<blockquote class="twitter-tweet">'
+replacement = '<blockquote class="twitter-tweet"></blockquote><p>'
+regex = false
+```
+
+**Order matters:** Replacements are applied sequentially. Each replacement sees the result of all previous replacements:
+
+```toml
+# First replacement changes foo to bar
+[[replacements]]
+pattern = 'foo'
+replacement = 'bar'
+regex = false
+
+# Second replacement then changes bar to baz
+# Result: 'foo' → 'bar' → 'baz'
+[[replacements]]
+pattern = 'bar'
+replacement = 'baz'
+regex = false
+```
+
+**Regex capture groups:**
+```toml
+# Capture groups are referenced with \1, \2, etc.
+[[replacements]]
+pattern = '<span class="(\w+)">(.*?)</span>'
+replacement = '<em class="highlight-\1">\2</em>'
+regex = true
+# Input:  <span class="important">text</span>
+# Output: <em class="highlight-important">text</em>
+```
+
+**Performance note:** Replacements are efficient even with many patterns. They're applied once per article after sanitization.
 
 ---
 
