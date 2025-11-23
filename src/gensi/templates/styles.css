@@ -5,7 +5,6 @@ body {
     line-height: 1.6;
     margin: 1em;
     padding: 0;
-    color: #333;
 }
 
 article {
@@ -76,6 +75,12 @@ h1.article-title {
     border-left: 3px solid #ddd;
     font-style: italic;
     color: #555;
+}
+
+.article-content hr {
+  width: 50%;
+  border: none;
+  border-top: 1px solid #000;
 }
 
 .article-content code {
