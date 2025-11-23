@@ -61,6 +61,7 @@ class GensiProcessor:
         self.sanitizer = Sanitizer()
         self.python_executor = PythonExecutor()
         self.cover_data: Optional[bytes] = None
+        self.cover_extension: Optional[str] = None
 
     def _report_progress(self, stage: str, current: int = 0, total: int = 0, message: str = ''):
         """Report progress to the callback."""
@@ -166,11 +167,20 @@ class GensiProcessor:
                 raw_data, _ = await fetcher.fetch_binary(cover_url, context="cover")
                 # Process cover image (resize and optimize)
                 try:
-                    self.cover_data, _ = process_image(raw_data, cover_url, image_type='cover')
+                    self.cover_data, self.cover_extension = process_image(
+                        raw_data, cover_url, image_type='cover'
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to process cover image {cover_url}: {e}")
                     # Fallback to raw data
                     self.cover_data = raw_data
+                    # Try to extract extension from URL
+                    from ..utils.url_utils import is_image_url
+                    from pathlib import Path
+                    from urllib.parse import urlparse
+                    parsed = urlparse(cover_url)
+                    ext = Path(parsed.path).suffix.lstrip('.')
+                    self.cover_extension = ext if ext else 'jpg'
             else:
                 # Page with image
                 html_content, final_url = await fetcher.fetch(cover_url, context="cover")
@@ -181,11 +191,19 @@ class GensiProcessor:
                     raw_data, _ = await fetcher.fetch_binary(cover_img_url, context="cover")
                     # Process cover image (resize and optimize)
                     try:
-                        self.cover_data, _ = process_image(raw_data, cover_img_url, image_type='cover')
+                        self.cover_data, self.cover_extension = process_image(
+                            raw_data, cover_img_url, image_type='cover'
+                        )
                     except Exception as e:
                         logger.warning(f"Failed to process cover image {cover_img_url}: {e}")
                         # Fallback to raw data
                         self.cover_data = raw_data
+                        # Try to extract extension from URL
+                        from pathlib import Path
+                        from urllib.parse import urlparse
+                        parsed = urlparse(cover_img_url)
+                        ext = Path(parsed.path).suffix.lstrip('.')
+                        self.cover_extension = ext if ext else 'jpg'
 
     async def _process_index(self, fetcher: CachedFetcher, index_config: dict) -> list[dict]:
         """
@@ -356,7 +374,8 @@ class GensiProcessor:
 
         # Add cover if available
         if self.cover_data:
-            builder.add_cover(self.cover_data)
+            cover_name = f"cover.{self.cover_extension}" if self.cover_extension else "cover.jpg"
+            builder.add_cover(self.cover_data, cover_name)
 
         # Add sections and articles
         for section in sections_data:
