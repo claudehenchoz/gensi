@@ -1,12 +1,16 @@
 """Image processing for articles - download and embed images in EPUB."""
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import Optional
 from lxml import html, etree
 from urllib.parse import urlparse
 
 from ..utils.url_utils import resolve_url
+from .image_optimizer import process_image
+
+logger = logging.getLogger(__name__)
 
 
 class ImageProcessor:
@@ -96,25 +100,30 @@ class ImageProcessor:
         except Exception:
             return html_content
 
-    def get_image_filename(self, url: str, index: int) -> str:
+    def get_image_filename(self, url: str, index: int, extension: Optional[str] = None) -> str:
         """
         Generate a unique filename for an image.
 
         Args:
             url: The image URL
             index: Image index for uniqueness
+            extension: Optional file extension to use (without dot). If not provided,
+                      will be extracted from URL.
 
         Returns:
             A filename like "image_001_abc123.jpg"
         """
-        # Get file extension from URL
-        parsed = urlparse(url)
-        path = parsed.path
-        ext = Path(path).suffix.lower()
+        if extension:
+            ext = f".{extension}"
+        else:
+            # Get file extension from URL
+            parsed = urlparse(url)
+            path = parsed.path
+            ext = Path(path).suffix.lower()
 
-        # Default to .jpg if no extension
-        if not ext or ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp']:
-            ext = '.jpg'
+            # Default to .jpg if no extension
+            if not ext or ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp']:
+                ext = '.jpg'
 
         # Create hash of URL for uniqueness
         url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
@@ -180,16 +189,22 @@ class ImageProcessor:
         except Exception:
             return html_content
 
-    async def download_images(self, images: list[dict], fetcher) -> dict[str, tuple[str, bytes]]:
+    async def download_images(
+        self,
+        images: list[dict],
+        fetcher,
+        image_type: str = 'article'
+    ) -> dict[str, tuple[str, bytes]]:
         """
-        Download images in parallel.
+        Download and process images.
 
         Args:
             images: List of image dicts with 'url'
             fetcher: Fetcher instance for downloading
+            image_type: Either 'cover' or 'article' (affects max dimensions)
 
         Returns:
-            Dict mapping absolute URL -> (filename, image_data)
+            Dict mapping absolute URL -> (filename, processed_image_data)
         """
         image_map = {}
 
@@ -204,12 +219,23 @@ class ImageProcessor:
                 # Download image
                 image_data, _ = await fetcher.fetch_binary(url, context="image")
 
-                # Generate filename
-                filename = self.get_image_filename(url, i)
+                # Process image (resize, convert format, optimize)
+                try:
+                    processed_data, extension = process_image(image_data, url, image_type)
 
-                image_map[url] = (filename, image_data)
+                    # Generate filename with correct extension
+                    filename = self.get_image_filename(url, i, extension)
+
+                    image_map[url] = (filename, processed_data)
+
+                except Exception as e:
+                    # Log warning but continue processing other images
+                    logger.warning(f"Failed to process image {url}: {e}")
+                    continue
+
             except Exception as e:
                 # Skip failed downloads
+                logger.debug(f"Failed to download image {url}: {e}")
                 pass
 
         return image_map
@@ -219,7 +245,8 @@ async def process_article_images(
     html_content: str,
     base_url: str,
     fetcher,
-    enable_images: bool = True
+    enable_images: bool = True,
+    image_type: str = 'article'
 ) -> tuple[str, dict[str, tuple[str, bytes]]]:
     """
     Process images in article content.
@@ -230,6 +257,7 @@ async def process_article_images(
         fetcher: Fetcher instance for downloading
         enable_images: Whether to download images (default: True).
                       If False, all img tags will be removed.
+        image_type: Either 'cover' or 'article' (affects max dimensions, default: 'article')
 
     Returns:
         Tuple of (updated_html_content, image_map)
@@ -248,8 +276,8 @@ async def process_article_images(
     # Extract all images
     images = processor.extract_images(html_content, base_url)
 
-    # Download images
-    image_map = await processor.download_images(images, fetcher)
+    # Download and process images
+    image_map = await processor.download_images(images, fetcher, image_type)
 
     # Update image references in HTML
     epub_path_map = {url: f"images/{filename}" for url, (filename, _) in image_map.items()}

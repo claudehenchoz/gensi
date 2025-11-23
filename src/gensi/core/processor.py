@@ -1,6 +1,7 @@
 """Main processor for orchestrating .gensi file processing into EPUB."""
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
@@ -13,8 +14,11 @@ from .sanitizer import Sanitizer
 from .python_executor import PythonExecutor
 from .epub_builder import EPUBBuilder
 from .image_processor import process_article_images
+from .image_optimizer import process_image
 from .typography import improve_typography
 from .replacements import apply_replacements
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -159,7 +163,14 @@ class GensiProcessor:
 
             if is_image_url(cover_url):
                 # Direct image URL
-                self.cover_data, _ = await fetcher.fetch_binary(cover_url, context="cover")
+                raw_data, _ = await fetcher.fetch_binary(cover_url, context="cover")
+                # Process cover image (resize and optimize)
+                try:
+                    self.cover_data, _ = process_image(raw_data, cover_url, image_type='cover')
+                except Exception as e:
+                    logger.warning(f"Failed to process cover image {cover_url}: {e}")
+                    # Fallback to raw data
+                    self.cover_data = raw_data
             else:
                 # Page with image
                 html_content, final_url = await fetcher.fetch(cover_url, context="cover")
@@ -167,7 +178,14 @@ class GensiProcessor:
                 cover_img_url = extractor.extract_cover_url(cover_config, self.python_executor)
 
                 if cover_img_url:
-                    self.cover_data, _ = await fetcher.fetch_binary(cover_img_url, context="cover")
+                    raw_data, _ = await fetcher.fetch_binary(cover_img_url, context="cover")
+                    # Process cover image (resize and optimize)
+                    try:
+                        self.cover_data, _ = process_image(raw_data, cover_img_url, image_type='cover')
+                    except Exception as e:
+                        logger.warning(f"Failed to process cover image {cover_img_url}: {e}")
+                        # Fallback to raw data
+                        self.cover_data = raw_data
 
     async def _process_index(self, fetcher: CachedFetcher, index_config: dict) -> list[dict]:
         """
@@ -257,7 +275,7 @@ class GensiProcessor:
             article_url = article_data['url']
             enable_images = article_config.get('images', True) if article_config else True
             sanitized_content, image_map = await process_article_images(
-                sanitized_content, article_url, fetcher, enable_images
+                sanitized_content, article_url, fetcher, enable_images, image_type='article'
             )
             return {
                 'url': article_url,
@@ -299,7 +317,9 @@ class GensiProcessor:
 
                 # Process images (download and update references)
                 enable_images = article_config.get('images', True) if article_config else True
-                sanitized, image_map = await process_article_images(sanitized, final_url, fetcher, enable_images)
+                sanitized, image_map = await process_article_images(
+                    sanitized, final_url, fetcher, enable_images, image_type='article'
+                )
 
                 extracted['content'] = sanitized
                 extracted['images'] = image_map  # Store image data
