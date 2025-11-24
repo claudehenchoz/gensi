@@ -346,21 +346,8 @@ class Extractor:
 
             content_elem = content_elem[0]
 
-            # Remove unwanted elements
-            remove_selectors = config.get('remove', [])
-            for remove_sel in remove_selectors:
-                for elem in content_elem.cssselect(remove_sel):
-                    elem.getparent().remove(elem)
-
-            # Extract HTML content
-            html_content = etree.tostring(content_elem, encoding='unicode', method='html')
-
-            # Resolve relative URLs in the HTML content
-            html_content = resolve_urls_in_html(html_content, self.base_url)
-
-            result['content'] = html_content
-
-            # Extract metadata using selectors or fallback
+            # Extract metadata BEFORE removing elements
+            # This allows extracting metadata from elements that will be removed
             title_selector = config.get('title')
             author_selector = config.get('author')
             date_selector = config.get('date')
@@ -381,6 +368,20 @@ class Extractor:
                     # Prefer text content (human-readable) over datetime attribute
                     text = date_elem[0].text_content().strip()
                     result['date'] = text if text else date_elem[0].get('datetime')
+
+            # NOW remove unwanted elements (after metadata extraction)
+            remove_selectors = config.get('remove', [])
+            for remove_sel in remove_selectors:
+                for elem in content_elem.cssselect(remove_sel):
+                    elem.getparent().remove(elem)
+
+            # Extract HTML content
+            html_content = etree.tostring(content_elem, encoding='unicode', method='html')
+
+            # Resolve relative URLs in the HTML content
+            html_content = resolve_urls_in_html(html_content, self.base_url)
+
+            result['content'] = html_content
 
             # Use fallback for missing metadata
             if not result['title'] or not result['author'] or not result['date']:

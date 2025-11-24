@@ -295,6 +295,63 @@ return {
         assert result.get('title') == 'OG Title' or result.get('title') is None
         assert result.get('author') == 'Meta Author' or result.get('author') is None
 
+    def test_extract_article_metadata_from_removed_element(self):
+        """Test that metadata is extracted before elements are removed.
+
+        This tests the bug fix where metadata (author, title, date) in elements
+        that are also in the 'remove' list should still be extracted successfully.
+        """
+        html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Page Title</title>
+</head>
+<body>
+    <article>
+        <div class="title-lead">
+            <h1 class="title">Article Title</h1>
+            <p class="byline">
+                <span class="author">Jane Smith</span>
+                <time class="date" datetime="2025-01-20">January 20, 2025</time>
+            </p>
+        </div>
+        <div class="content">
+            <p>This is the actual article content that should remain.</p>
+            <p>More content here.</p>
+        </div>
+    </article>
+</body>
+</html>
+"""
+        extractor = Extractor("http://example.com/article.html", html)
+        config = {
+            'content': 'article',
+            'title': 'h1.title',
+            'author': 'span.author',
+            'date': 'time.date',
+            'remove': [
+                'div.title-lead',  # This div contains the title, author, and date!
+            ]
+        }
+        executor = PythonExecutor()
+
+        result = extractor.extract_article_content(config, executor)
+
+        # Metadata should be extracted even though elements are in 'remove' list
+        assert result['title'] == 'Article Title'
+        assert result['author'] == 'Jane Smith'
+        assert result['date'] == 'January 20, 2025'
+
+        # The title-lead div should be removed from content
+        assert 'title-lead' not in result['content']
+        assert 'Article Title' not in result['content']  # Title should be removed
+        assert 'Jane Smith' not in result['content']  # Author should be removed
+
+        # But the actual content should remain
+        assert 'This is the actual article content that should remain.' in result['content']
+        assert 'More content here.' in result['content']
+
 
 class TestRSSParsing:
     """Test RSS/Atom feed parsing."""
