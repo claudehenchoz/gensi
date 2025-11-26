@@ -17,6 +17,9 @@ from .image_processor import process_article_images
 from .image_optimizer import process_image
 from .typography import improve_typography
 from .replacements import apply_replacements
+from .cover_generator import CoverGenerator
+from ..utils.thumbnail_extractor import extract_thumbnails
+from lxml import html as lxml_html
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +141,10 @@ class GensiProcessor:
                     )
                     section['articles'] = processed_articles
 
+                # Generate automatic cover if no explicit cover was provided
+                if not self.parser.cover and not self.cover_data:
+                    await self._generate_auto_cover(sections_data)
+
             # Build EPUB
             self._report_progress('building', message='Building EPUB file')
             output_path = await self._build_epub(sections_data)
@@ -204,6 +211,57 @@ class GensiProcessor:
                         parsed = urlparse(cover_img_url)
                         ext = Path(parsed.path).suffix.lstrip('.')
                         self.cover_extension = ext if ext else 'jpg'
+
+    async def _generate_auto_cover(self, sections_data: list[dict]) -> None:
+        """
+        Generate cover automatically from article thumbnails.
+
+        Args:
+            sections_data: Processed sections with articles containing thumbnails
+        """
+        self._report_progress('cover', message='Generating automatic cover')
+
+        # Collect thumbnails from all articles
+        thumbnail_urls = []
+        for section in sections_data:
+            for article in section['articles']:
+                thumbnail = article.get('thumbnail')
+                if thumbnail:
+                    thumbnail_urls.append(thumbnail)
+
+        # Deduplicate while preserving order, limit to 6
+        seen = set()
+        unique_thumbnails = []
+        for url in thumbnail_urls:
+            if url not in seen:
+                seen.add(url)
+                unique_thumbnails.append(url)
+        unique_thumbnails = unique_thumbnails[:6]
+
+        logger.info(f"Auto-cover: Found {len(unique_thumbnails)} unique thumbnails")
+
+        if not unique_thumbnails:
+            logger.info("Auto-cover: No thumbnails found, generating text-only cover")
+
+        # Generate cover
+        try:
+            async with CachedFetcher(cache_enabled=self.cache_enabled) as fetcher:
+                generator = CoverGenerator()
+                cover_data, cover_ext = await generator.generate_from_thumbnails(
+                    thumbnail_urls=unique_thumbnails,
+                    title=self.parser.title,
+                    author=self.parser.author,
+                    fetcher=fetcher,
+                    fallback_to_text=True
+                )
+
+                self.cover_data = cover_data
+                self.cover_extension = cover_ext
+                logger.info(f"Auto-cover: Generated ({len(cover_data)} bytes, .{cover_ext})")
+
+        except Exception as e:
+            logger.warning(f"Auto-cover generation failed: {e}")
+            # Don't raise - it's OK to have no cover
 
     async def _process_index(self, fetcher: CachedFetcher, index_config: dict) -> list[dict]:
         """
@@ -306,18 +364,38 @@ class GensiProcessor:
             sanitized_content, image_map = await process_article_images(
                 sanitized_content, article_url, fetcher, enable_images, image_type='article'
             )
+
+            # Extract thumbnail for potential cover generation
+            thumbnail = None
+            try:
+                doc = lxml_html.fromstring(sanitized_content)
+                thumbnails = extract_thumbnails(doc, article_url, max_count=1)
+                thumbnail = thumbnails[0] if thumbnails else None
+            except Exception as e:
+                logger.debug(f"Failed to extract thumbnail from {article_url}: {e}")
+
             return {
                 'url': article_url,
                 'content': sanitized_content,
                 'title': article_data.get('title'),
                 'author': article_data.get('author'),
                 'date': article_data.get('date'),
-                'images': image_map
+                'images': image_map,
+                'thumbnail': thumbnail
             }
 
         # Fetch article
         article_url = article_data['url']
         content, final_url = await fetcher.fetch(article_url, context="article")
+
+        # Extract thumbnail from ORIGINAL full HTML (before content extraction strips meta tags)
+        thumbnail = None
+        try:
+            doc = lxml_html.fromstring(content)
+            thumbnails = extract_thumbnails(doc, final_url, max_count=1)
+            thumbnail = thumbnails[0] if thumbnails else None
+        except Exception as e:
+            logger.debug(f"Failed to extract thumbnail from {final_url}: {e}")
 
         # Extract content
         if article_config:
@@ -352,8 +430,10 @@ class GensiProcessor:
 
                 extracted['content'] = sanitized
                 extracted['images'] = image_map  # Store image data
+                extracted['thumbnail'] = thumbnail  # Use thumbnail extracted from full HTML
             else:
                 extracted['images'] = {}
+                extracted['thumbnail'] = thumbnail  # Use thumbnail extracted from full HTML
 
             return extracted
         else:
@@ -364,7 +444,8 @@ class GensiProcessor:
                 'title': article_url,
                 'author': None,
                 'date': None,
-                'images': {}
+                'images': {},
+                'thumbnail': thumbnail  # Use thumbnail extracted from full HTML
             }
 
     async def _build_epub(self, sections_data: list[dict]) -> Path:
