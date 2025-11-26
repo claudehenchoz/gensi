@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from gensi.core.extractor import Extractor, parse_rss_feed
+from gensi.core.extractor import Extractor, parse_rss_feed, parse_bluesky_feed
 from gensi.core.python_executor import PythonExecutor
 
 
@@ -426,6 +426,239 @@ return articles
 
         # Should only get articles with Technology tag and without Sponsor
         assert len(articles) == 2  # Articles 1 and 4 from test_feed_with_tags.xml
+
+
+class TestBlueskyFeedParsing:
+    """Test Bluesky feed parsing."""
+
+    def test_parse_bluesky_with_external_embeds(self):
+        """Extract URLs from card embeds."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article2'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://example.com/article1'
+        assert articles[1]['url'] == 'https://example.com/article2'
+
+    def test_parse_bluesky_deduplicates_urls(self):
+        """Ensure duplicate URLs are filtered."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 1
+
+    def test_parse_bluesky_with_limit(self):
+        """Test limit parameter."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': f'https://example.com/article{i}'}}}}
+                for i in range(10)
+            ]
+        })
+
+        config = {'username': 'test.bsky.social', 'limit': 3}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 3
+
+    def test_parse_bluesky_ignores_non_external_embeds(self):
+        """Non-card embeds should be ignored."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.images#view'}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 1
+        assert articles[0]['url'] == 'https://example.com/article1'
+
+    def test_parse_bluesky_api_error(self):
+        """Handle API error responses."""
+        import json
+        feed_content = json.dumps({
+            'error': 'InvalidRequest',
+            'message': 'Actor not found'
+        })
+
+        config = {'username': 'invalid.bsky.social'}
+
+        with pytest.raises(Exception, match='Bluesky API error: Actor not found'):
+            parse_bluesky_feed('', feed_content, config)
+
+    def test_parse_bluesky_invalid_json(self):
+        """Handle invalid JSON responses."""
+        config = {'username': 'test.bsky.social'}
+
+        with pytest.raises(Exception, match='Failed to parse Bluesky API response'):
+            parse_bluesky_feed('', 'invalid json{', config)
+
+    def test_parse_bluesky_with_python_override(self):
+        """Test Python override for custom filtering."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://other.com/article2'}}}}
+            ]
+        })
+
+        config = {
+            'username': 'test.bsky.social',
+            'python': {
+                'script': '''
+articles = []
+for entry in feed['feed']:
+    post = entry.get('post', {})
+    embed = post.get('embed', {})
+    if embed.get('$type') == 'app.bsky.embed.external#view':
+        uri = embed.get('external', {}).get('uri')
+        if uri and 'example.com' in uri:
+            articles.append({'url': uri})
+return articles
+'''
+            }
+        }
+
+        executor = PythonExecutor()
+        articles = parse_bluesky_feed('', feed_content, config, executor)
+
+        assert len(articles) == 1
+        assert articles[0]['url'] == 'https://example.com/article1'
+
+    def test_parse_bluesky_with_domain_filter(self):
+        """Test domain filtering for exact domain match."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://republik.ch/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article2'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://republik.ch/article3'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social', 'domain': 'republik.ch'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://republik.ch/article1'
+        assert articles[1]['url'] == 'https://republik.ch/article3'
+
+    def test_parse_bluesky_with_subdomain_filter(self):
+        """Test domain filtering includes subdomains."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://republik.ch/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://www.republik.ch/article2'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://content.republik.ch/article3'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://other.com/article4'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social', 'domain': 'republik.ch'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 3
+        assert articles[0]['url'] == 'https://republik.ch/article1'
+        assert articles[1]['url'] == 'https://www.republik.ch/article2'
+        assert articles[2]['url'] == 'https://content.republik.ch/article3'
+
+    def test_parse_bluesky_domain_filter_with_limit(self):
+        """Test domain filtering combined with limit."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://republik.ch/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article2'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://www.republik.ch/article3'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://content.republik.ch/article4'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social', 'domain': 'republik.ch', 'limit': 2}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        # Should get first 2 matching republik.ch URLs
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://republik.ch/article1'
+        assert articles[1]['url'] == 'https://www.republik.ch/article3'
+
+    def test_parse_bluesky_without_domain_filter(self):
+        """Test that without domain filter, all URLs are returned."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://republik.ch/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article2'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://other.org/article3'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 3
+
+    def test_parse_bluesky_domain_filter_no_matches(self):
+        """Test domain filtering when no URLs match."""
+        import json
+        feed_content = json.dumps({
+            'feed': [
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://example.com/article1'}}}},
+                {'post': {'embed': {'$type': 'app.bsky.embed.external#view',
+                         'external': {'uri': 'https://other.org/article2'}}}}
+            ]
+        })
+
+        config = {'username': 'test.bsky.social', 'domain': 'republik.ch'}
+        articles = parse_bluesky_feed('', feed_content, config)
+
+        assert len(articles) == 0
 
 
 class TestURLTransformation:

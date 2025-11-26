@@ -49,8 +49,8 @@ class GensiParser:
                 raise ValueError(f"Index {i}: 'url' is required")
             if 'type' not in index:
                 raise ValueError(f"Index {i}: 'type' is required")
-            if index['type'] not in ['html', 'rss', 'json']:
-                raise ValueError(f"Index {i}: 'type' must be 'html', 'rss', or 'json'")
+            if index['type'] not in ['html', 'rss', 'json', 'bluesky']:
+                raise ValueError(f"Index {i}: 'type' must be 'html', 'rss', 'json', or 'bluesky'")
 
             # Validate HTML index
             if index['type'] == 'html':
@@ -72,6 +72,16 @@ class GensiParser:
                         raise ValueError(f"Index {i}: 'json_path' is required for JSON type in simple mode")
                     if 'links' not in index:
                         raise ValueError(f"Index {i}: 'links' is required for JSON type in simple mode (CSS selector for HTML extracted from JSON)")
+
+            # Validate Bluesky index
+            elif index['type'] == 'bluesky':
+                if 'python' not in index and 'username' not in index:
+                    raise ValueError(f"Index {i}: 'username' is required for Bluesky type in simple mode")
+
+                if 'limit' in index:
+                    limit = index['limit']
+                    if not isinstance(limit, int) or limit < 1 or limit > 100:
+                        raise ValueError(f"Index {i}: 'limit' must be an integer between 1 and 100")
 
             # Validate url_transform section if present
             if 'url_transform' in index:

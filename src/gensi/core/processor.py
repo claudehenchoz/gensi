@@ -9,7 +9,7 @@ from slugify import slugify
 
 from .parser import GensiParser
 from .cached_fetcher import CachedFetcher
-from .extractor import Extractor, parse_rss_feed
+from .extractor import Extractor, parse_rss_feed, parse_bluesky_feed
 from .sanitizer import Sanitizer
 from .python_executor import PythonExecutor
 from .epub_builder import EPUBBuilder
@@ -260,6 +260,17 @@ class GensiProcessor:
             # Fetch RSS/Atom feed (not cached due to context="index")
             feed_content, final_url = await fetcher.fetch(index_url, context="index")
             articles = parse_rss_feed(final_url, feed_content, index_config, self.python_executor)
+            return articles
+
+        elif index_type == 'bluesky':
+            # Build Bluesky API URL
+            username = index_config.get('username')
+            limit = index_config.get('limit', 20)
+            api_url = f"https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor={username}&limit={limit}"
+
+            # Fetch from API (not cached)
+            json_content, final_url = await fetcher.fetch(api_url, context="index")
+            articles = parse_bluesky_feed(final_url, json_content, index_config, self.python_executor)
             return articles
 
         else:

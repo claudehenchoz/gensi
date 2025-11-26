@@ -348,6 +348,90 @@ use_content_encoded = true
         parser = GensiParser(gensi_path)
         assert parser.indices[0]['use_content_encoded'] is True
 
+    def test_parse_bluesky_index(self, temp_dir):
+        """Test parsing valid Bluesky index."""
+        content = """
+title = "Bluesky EPUB"
+
+[[index]]
+url = "https://bsky.app/profile/test.bsky.social"
+type = "bluesky"
+username = "test.bsky.social"
+limit = 40
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'bluesky.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'bluesky'
+        assert parser.indices[0]['username'] == 'test.bsky.social'
+        assert parser.indices[0]['limit'] == 40
+
+    def test_bluesky_missing_username(self, temp_dir):
+        """Validate username requirement."""
+        content = """
+title = "Bluesky EPUB"
+
+[[index]]
+url = "https://bsky.app/profile/test.bsky.social"
+type = "bluesky"
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'invalid.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="'username' is required for Bluesky type"):
+            GensiParser(gensi_path)
+
+    def test_bluesky_invalid_limit(self, temp_dir):
+        """Validate limit constraints."""
+        content = """
+title = "Bluesky EPUB"
+
+[[index]]
+url = "https://bsky.app/profile/test.bsky.social"
+type = "bluesky"
+username = "test.bsky.social"
+limit = 150
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'invalid.gensi'
+        gensi_path.write_text(content)
+
+        with pytest.raises(ValueError, match="'limit' must be an integer between 1 and 100"):
+            GensiParser(gensi_path)
+
+    def test_parse_bluesky_with_domain(self, temp_dir):
+        """Test parsing Bluesky index with domain filter."""
+        content = """
+title = "Bluesky EPUB"
+
+[[index]]
+url = "https://bsky.app/profile/test.bsky.social"
+type = "bluesky"
+username = "test.bsky.social"
+domain = "republik.ch"
+limit = 7
+
+[article]
+content = "div.content"
+"""
+        gensi_path = temp_dir / 'bluesky_domain.gensi'
+        gensi_path.write_text(content)
+
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'bluesky'
+        assert parser.indices[0]['username'] == 'test.bsky.social'
+        assert parser.indices[0]['domain'] == 'republik.ch'
+        assert parser.indices[0]['limit'] == 7
+
     def test_article_with_remove_array(self, valid_gensi_simple):
         """Test article with remove selectors array."""
         parser = GensiParser(valid_gensi_simple)

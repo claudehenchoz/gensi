@@ -451,3 +451,93 @@ def parse_rss_feed(
         articles.append(article)
 
     return articles
+
+
+def parse_bluesky_feed(
+    feed_url: str, feed_content: str, config: dict[str, Any], python_executor=None
+) -> list[dict[str, Any]]:
+    """
+    Parse a Bluesky author feed and extract article URLs from card embeds.
+
+    Args:
+        feed_url: The feed URL (for context)
+        feed_content: The JSON response from Bluesky API
+        config: The index configuration
+        python_executor: Python executor instance for running scripts
+
+    Returns:
+        List of dictionaries with 'url' key (distinct URLs from card embeds)
+    """
+    import json
+    from urllib.parse import urlparse
+
+    # Parse JSON response
+    try:
+        data = json.loads(feed_content)
+    except json.JSONDecodeError as e:
+        raise Exception(f"Failed to parse Bluesky API response: {str(e)}") from e
+
+    # Check for API errors
+    if 'error' in data:
+        error_msg = data.get('message', 'Unknown error')
+        raise Exception(f"Bluesky API error: {error_msg}")
+
+    # Python override mode
+    if 'python' in config and python_executor:
+        result = python_executor.execute(config['python']['script'], {'feed': data})
+        if not isinstance(result, list):
+            raise TypeError(f"Bluesky index Python script must return list, got {type(result)}")
+
+        articles = []
+        for item in result:
+            if not isinstance(item, dict) or 'url' not in item:
+                raise ValueError("Bluesky index Python script must return list of dicts with 'url' key")
+            article = {'url': item['url']}
+            if 'content' in item:
+                article['content'] = item['content']
+            articles.append(article)
+        return articles
+
+    # Helper function to check if URL matches domain filter
+    def matches_domain(url: str, domain: str) -> bool:
+        """Check if URL is from the specified domain or subdomain."""
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+
+            # Exact match or subdomain match
+            return hostname == domain or hostname.endswith('.' + domain)
+        except Exception:
+            return False
+
+    # Simple mode: extract URLs from card embeds
+    feed_entries = data.get('feed', [])
+    seen_urls = set()
+    articles = []
+    domain_filter = config.get('domain')
+
+    for entry in feed_entries:
+        post = entry.get('post', {})
+        embed = post.get('embed', {})
+
+        # Only extract external embeds (card/link attachments)
+        if embed.get('$type') == 'app.bsky.embed.external#view':
+            external = embed.get('external', {})
+            uri = external.get('uri')
+
+            if uri and uri not in seen_urls:
+                # Apply domain filter if specified
+                if domain_filter and not matches_domain(uri, domain_filter):
+                    continue
+
+                seen_urls.add(uri)
+                articles.append({'url': uri})
+
+    # Apply limit
+    limit = config.get('limit')
+    if limit:
+        articles = articles[:limit]
+
+    return articles
