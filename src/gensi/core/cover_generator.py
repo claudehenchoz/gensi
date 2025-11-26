@@ -345,7 +345,7 @@ class CoverGenerator:
         Args:
             base_image: Base PIL Image
             title: Publication title
-            author: Author/publisher name (optional)
+            author: Author/publisher name (optional, shown as generation date if provided)
 
         Returns:
             PIL Image with banner added
@@ -373,28 +373,30 @@ class CoverGenerator:
         # Draw text on result
         draw = ImageDraw.Draw(result)
 
-        # Title
-        title_font = self._get_font(48, bold=True)
+        # Title (smaller size to fit better)
+        title_font = self._get_font(36, bold=True)
         title_truncated = self._truncate_text(title, title_font, COVER_WIDTH - 40)
 
         bbox = draw.textbbox((0, 0), title_truncated, font=title_font)
         text_width = bbox[2] - bbox[0]
         x = (COVER_WIDTH - text_width) // 2
-        y = banner_top + 20
+        y = banner_top + 25
 
         draw.text((x, y), title_truncated, font=title_font, fill='white')
 
-        # Author (if provided)
-        if author:
-            author_font = self._get_font(32, bold=False)
-            author_truncated = self._truncate_text(author, author_font, COVER_WIDTH - 40)
+        # Generation date/time
+        from datetime import datetime
+        date_text = datetime.now().strftime("%B %d, %Y · %H:%M")
 
-            bbox = draw.textbbox((0, 0), author_truncated, font=author_font)
-            text_width = bbox[2] - bbox[0]
-            x = (COVER_WIDTH - text_width) // 2
-            y = banner_top + 20 + 48 + 10  # Below title
+        date_font = self._get_font(24, bold=False)
+        date_truncated = self._truncate_text(date_text, date_font, COVER_WIDTH - 40)
 
-            draw.text((x, y), author_truncated, font=author_font, fill='white')
+        bbox = draw.textbbox((0, 0), date_truncated, font=date_font)
+        text_width = bbox[2] - bbox[0]
+        x = (COVER_WIDTH - text_width) // 2
+        y = banner_top + 25 + 36 + 8  # Below title with 8px spacing
+
+        draw.text((x, y), date_truncated, font=date_font, fill='white')
 
         # Convert back to RGB for JPEG
         final = result.convert('RGB')
