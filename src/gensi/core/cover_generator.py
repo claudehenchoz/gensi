@@ -15,7 +15,7 @@ COVER_WIDTH = 1264
 COVER_HEIGHT = 1680
 
 # Banner height at bottom
-BANNER_HEIGHT = 100
+BANNER_HEIGHT = 200
 
 # Layout configurations (rows, cols)
 # Designed for landscape thumbnails on portrait cover (1264x1680)
@@ -374,7 +374,7 @@ class CoverGenerator:
         draw = ImageDraw.Draw(result)
 
         # Title (smaller size to fit better)
-        title_font = self._get_font(36, bold=True)
+        title_font = self._get_font(72, bold=True)
         title_truncated = self._truncate_text(title, title_font, COVER_WIDTH - 40)
 
         bbox = draw.textbbox((0, 0), title_truncated, font=title_font)
@@ -388,13 +388,13 @@ class CoverGenerator:
         from datetime import datetime
         date_text = datetime.now().strftime("%B %d, %Y · %H:%M")
 
-        date_font = self._get_font(24, bold=False)
+        date_font = self._get_font(36, bold=False)
         date_truncated = self._truncate_text(date_text, date_font, COVER_WIDTH - 40)
 
         bbox = draw.textbbox((0, 0), date_truncated, font=date_font)
         text_width = bbox[2] - bbox[0]
         x = (COVER_WIDTH - text_width) // 2
-        y = banner_top + 25 + 36 + 8  # Below title with 8px spacing
+        y = banner_top + 25 + 72 + 30  # Below title with 50px spacing
 
         draw.text((x, y), date_truncated, font=date_font, fill='white')
 
