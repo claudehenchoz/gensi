@@ -1,7 +1,9 @@
 """Image processing for articles - download and embed images in EPUB."""
 
+import asyncio
 import hashlib
 import logging
+from functools import partial
 from pathlib import Path
 from typing import Optional
 from lxml import html, etree
@@ -108,7 +110,7 @@ class ImageProcessor:
             url: The image URL
             index: Image index for uniqueness
             extension: Optional file extension to use (without dot). If not provided,
-                      will be extracted from URL.
+                       will be extracted from URL.
 
         Returns:
             A filename like "image_001_abc123.jpg"
@@ -196,7 +198,7 @@ class ImageProcessor:
         image_type: str = 'article'
     ) -> dict[str, tuple[str, bytes]]:
         """
-        Download and process images.
+        Download and process images concurrently.
 
         Args:
             images: List of image dicts with 'url'
@@ -207,36 +209,56 @@ class ImageProcessor:
             Dict mapping absolute URL -> (filename, processed_image_data)
         """
         image_map = {}
-
+        
+        # Deduplicate images based on URL before processing
+        # We store the first index encountered to maintain relative ordering in filenames
+        unique_images = {}
         for i, img_info in enumerate(images):
             url = img_info['url']
+            if url not in unique_images:
+                unique_images[url] = i
 
-            # Skip if already downloaded
-            if url in image_map:
-                continue
+        # Limit concurrent downloads to prevent connection pool exhaustion
+        sem = asyncio.Semaphore(5)
+        loop = asyncio.get_running_loop()
 
-            try:
-                # Download image
-                image_data, _ = await fetcher.fetch_binary(url, context="image")
-
-                # Process image (resize, convert format, optimize)
+        async def _process_single_image(url: str, idx: int):
+            async with sem:
                 try:
-                    processed_data, extension = process_image(image_data, url, image_type)
+                    # 1. Download image (I/O Bound - Async)
+                    image_data, _ = await fetcher.fetch_binary(url, context="image")
+
+                    # 2. Process image (CPU Bound - Offload to Executor)
+                    # This prevents the event loop from blocking during image resizing
+                    processed_data, extension = await loop.run_in_executor(
+                        None,  # Use default ThreadPoolExecutor
+                        partial(process_image, image_data, url, image_type)
+                    )
 
                     # Generate filename with correct extension
-                    filename = self.get_image_filename(url, i, extension)
-
-                    image_map[url] = (filename, processed_data)
+                    filename = self.get_image_filename(url, idx, extension)
+                    return url, filename, processed_data
 
                 except Exception as e:
                     # Log warning but continue processing other images
                     logger.warning(f"Failed to process image {url}: {e}")
-                    continue
+                    return None
 
-            except Exception as e:
-                # Skip failed downloads
-                logger.debug(f"Failed to download image {url}: {e}")
-                pass
+        # Create tasks for all unique images
+        tasks = [
+            _process_single_image(url, idx) 
+            for url, idx in unique_images.items()
+        ]
+
+        # Wait for all tasks to complete
+        if tasks:
+            results = await asyncio.gather(*tasks)
+            
+            # Populate the map with successful results
+            for result in results:
+                if result:
+                    url, filename, data = result
+                    image_map[url] = (filename, data)
 
         return image_map
 
