@@ -3,7 +3,7 @@ Tests for JSON path extraction utilities.
 """
 
 import pytest
-from gensi.core.json_utils import extract_json_path, extract_json_paths, JSONExtractionError
+from gensi.core.json_utils import extract_json_path, extract_json_paths, extract_json_paths_as_list, JSONExtractionError
 
 
 class TestExtractJsonPath:
@@ -134,6 +134,119 @@ class TestExtractJsonPaths:
         """Test that invalid JSON raises error in multiple extraction."""
         with pytest.raises(JSONExtractionError, match="Failed to parse JSON"):
             extract_json_paths("invalid json", {"field": "path"})
+
+
+class TestExtractJsonPathsAsList:
+    """Tests for extract_json_paths_as_list function (array extraction)."""
+
+    def test_extract_simple_array_from_dict(self):
+        """Test extracting all URLs from JSON array."""
+        data = {
+            "results": [
+                {"url": "https://example.com/1"},
+                {"url": "https://example.com/2"},
+                {"url": "https://example.com/3"}
+            ]
+        }
+        result = extract_json_paths_as_list(data, "results[*].url")
+        assert len(result) == 3
+        assert result == [
+            "https://example.com/1",
+            "https://example.com/2",
+            "https://example.com/3"
+        ]
+
+    def test_extract_array_from_json_string(self):
+        """Test extracting array from JSON string."""
+        json_str = '{"items": [{"id": "a"}, {"id": "b"}, {"id": "c"}]}'
+        result = extract_json_paths_as_list(json_str, "items[*].id")
+        assert result == ["a", "b", "c"]
+
+    def test_extract_nested_object_arrays(self):
+        """Test extracting from nested object arrays."""
+        data = {
+            "data": {
+                "items": [
+                    {"link": {"href": "/page1"}},
+                    {"link": {"href": "/page2"}},
+                    {"link": {"href": "/page3"}}
+                ]
+            }
+        }
+        result = extract_json_paths_as_list(data, "data.items[*].link.href")
+        assert result == ["/page1", "/page2", "/page3"]
+
+    def test_extract_with_dollar_prefix(self):
+        """Test with explicit $ prefix."""
+        data = {"items": [{"id": "1"}, {"id": "2"}]}
+        result = extract_json_paths_as_list(data, "$.items[*].id")
+        assert result == ["1", "2"]
+
+    def test_extract_mixed_types_in_array(self):
+        """Test extracting array with mixed types."""
+        data = {"values": [{"val": 1}, {"val": "string"}, {"val": True}, {"val": None}]}
+        result = extract_json_paths_as_list(data, "values[*].val")
+        assert result == [1, "string", True, None]
+
+    def test_extract_single_element_returns_list(self):
+        """Test that single element is still returned as list."""
+        data = {"items": [{"url": "https://example.com"}]}
+        result = extract_json_paths_as_list(data, "items[*].url")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0] == "https://example.com"
+
+    def test_empty_array_raises_error(self):
+        """Test that empty array raises JSONExtractionError."""
+        data = {"results": []}
+        with pytest.raises(JSONExtractionError, match="did not match any values"):
+            extract_json_paths_as_list(data, "results[*].url")
+
+    def test_nonexistent_path_raises_error(self):
+        """Test that nonexistent paths raise JSONExtractionError."""
+        data = {"data": {"value": "test"}}
+        with pytest.raises(JSONExtractionError, match="did not match any values"):
+            extract_json_paths_as_list(data, "nonexistent[*].path")
+
+    def test_invalid_json_string_raises_error(self):
+        """Test that invalid JSON strings raise JSONExtractionError."""
+        with pytest.raises(JSONExtractionError, match="Failed to parse JSON"):
+            extract_json_paths_as_list("not valid json", "some[*].path")
+
+    def test_invalid_jsonpath_expression_raises_error(self):
+        """Test that invalid JSONPath expressions raise JSONExtractionError."""
+        data = {"value": "test"}
+        with pytest.raises(JSONExtractionError, match="Failed to parse JSONPath expression"):
+            extract_json_paths_as_list(data, "$.[[[invalid")
+
+    def test_lux_magazine_structure(self):
+        """Test extracting URLs from Lux Magazine API structure."""
+        json_response = {
+            "results": [
+                {
+                    "id": 9641,
+                    "title": "No Lesbians",
+                    "permalink": "https://lux-magazine.com/article/queer-immigration/",
+                    "date": {"formatted": "July 11, 2025"}
+                },
+                {
+                    "id": 9642,
+                    "title": "Another Article",
+                    "permalink": "https://lux-magazine.com/article/another-article/",
+                    "date": {"formatted": "July 12, 2025"}
+                }
+            ]
+        }
+        result = extract_json_paths_as_list(json_response, "results[*].permalink")
+        assert len(result) == 2
+        assert result[0] == "https://lux-magazine.com/article/queer-immigration/"
+        assert result[1] == "https://lux-magazine.com/article/another-article/"
+
+    def test_direct_array_without_wildcard(self):
+        """Test extracting direct array values."""
+        data = {"urls": ["https://a.com", "https://b.com", "https://c.com"]}
+        result = extract_json_paths_as_list(data, "urls[*]")
+        assert result == ["https://a.com", "https://b.com", "https://c.com"]
 
 
 class TestRealWorldExamples:

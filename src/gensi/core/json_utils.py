@@ -89,3 +89,55 @@ def extract_json_paths(json_data: Union[str, dict], paths: dict[str, str]) -> di
             raise JSONExtractionError(f"Failed to extract '{field_name}': {e}")
 
     return results
+
+
+def extract_json_paths_as_list(json_data: Union[str, dict], path: str) -> list[Any]:
+    """
+    Extract multiple values from JSON using a JSONPath expression.
+    Returns ALL matches, not just the first match.
+
+    This is useful for extracting arrays of values, such as extracting all article URLs
+    from a JSON API response.
+
+    Args:
+        json_data: Either a JSON string or a parsed dict/list
+        path: JSONPath expression (e.g., "results[*].permalink", "data.items[*].url")
+
+    Returns:
+        List of all matched values
+
+    Raises:
+        JSONExtractionError: If JSON parsing fails or path doesn't match anything
+
+    Example:
+        >>> data = {"results": [{"url": "a"}, {"url": "b"}, {"url": "c"}]}
+        >>> extract_json_paths_as_list(data, "results[*].url")
+        ["a", "b", "c"]
+    """
+    # Parse JSON string if needed
+    if isinstance(json_data, str):
+        try:
+            parsed_data = json.loads(json_data)
+        except json.JSONDecodeError as e:
+            raise JSONExtractionError(f"Failed to parse JSON: {e}")
+    else:
+        parsed_data = json_data
+
+    # Normalize path (add $ prefix if not present)
+    if not path.startswith("$"):
+        # Convert dot notation to JSONPath notation
+        # "results[*].url" -> "$.results[*].url"
+        path = f"$.{path}"
+
+    # Parse and execute JSONPath expression
+    try:
+        jsonpath_expr = jsonpath_parse(path)
+        matches = jsonpath_expr.find(parsed_data)
+    except Exception as e:
+        raise JSONExtractionError(f"Failed to parse JSONPath expression '{path}': {e}")
+
+    if not matches:
+        raise JSONExtractionError(f"JSONPath '{path}' did not match any values in the JSON data")
+
+    # Return all match values as a list
+    return [match.value for match in matches]

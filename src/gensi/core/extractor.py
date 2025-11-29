@@ -6,7 +6,7 @@ import feedparser
 import re
 from ..utils.url_utils import resolve_url, resolve_urls_in_html
 from ..utils.metadata_fallback import extract_metadata_fallback
-from .json_utils import extract_json_path, extract_json_paths
+from .json_utils import extract_json_path, extract_json_paths, extract_json_paths_as_list, JSONExtractionError
 
 
 class Extractor:
@@ -130,7 +130,21 @@ class Extractor:
                 articles.append(article)
             return articles
 
-        # Simple mode
+        # NEW: Direct JSON links mode (when type='json', json_path present, links absent)
+        if self.content_type == 'json' and 'json_path' in config and 'links' not in config:
+            json_path = config['json_path']
+            try:
+                urls = extract_json_paths_as_list(self.content, json_path)
+                articles = []
+                for url in urls:
+                    # Filter: only strings, skip empty/None
+                    if isinstance(url, str) and url.strip():
+                        articles.append({'url': resolve_url(self.base_url, url)})
+                return articles
+            except JSONExtractionError as e:
+                raise Exception(f"Failed to extract index articles: {str(e)}") from e
+
+        # Simple mode (HTML extraction)
         links_selector = config.get('links')
 
         if not links_selector:

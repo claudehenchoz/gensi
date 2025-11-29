@@ -66,12 +66,13 @@ class GensiParser:
 
             # Validate JSON index
             elif index['type'] == 'json':
-                # JSON indices require either json_path+links or python override
+                # JSON indices require either json_path or python override
                 if 'python' not in index:
                     if 'json_path' not in index:
                         raise ValueError(f"Index {i}: 'json_path' is required for JSON type in simple mode")
-                    if 'links' not in index:
-                        raise ValueError(f"Index {i}: 'links' is required for JSON type in simple mode (CSS selector for HTML extracted from JSON)")
+                    # links is now optional:
+                    # - If present: HTML extraction mode (extract HTML from JSON, then use CSS selector)
+                    # - If absent: Direct links mode (extract URLs directly from JSON)
 
             # Validate Bluesky index
             elif index['type'] == 'bluesky':

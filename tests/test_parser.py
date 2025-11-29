@@ -546,20 +546,59 @@ links = ".article-link"
         with pytest.raises(ValueError, match="json_path.*required.*JSON type"):
             GensiParser(gensi_path)
 
-    def test_json_index_missing_links(self, temp_dir):
-        """Test that JSON index without links in simple mode raises error."""
+    def test_json_index_direct_links_valid(self, temp_dir):
+        """Test that JSON index without links is valid (direct links mode)."""
         content = """
-title = "Test"
+title = "Direct Links Test"
 
 [[index]]
-url = "http://localhost/graphql"
+url = "https://api.example.com/articles"
 type = "json"
-json_path = "data.content"
+json_path = "results[*].permalink"
 """
-        gensi_path = temp_dir / 'json_missing_links.gensi'
+        gensi_path = temp_dir / 'direct_links.gensi'
         gensi_path.write_text(content)
 
-        with pytest.raises(ValueError, match="links.*required.*JSON type"):
+        # Should NOT raise validation error
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'json'
+        assert 'json_path' in parser.indices[0]
+        assert 'links' not in parser.indices[0]
+
+    def test_json_index_html_extraction_still_valid(self, temp_dir):
+        """Test that existing HTML extraction configs still work."""
+        content = """
+title = "HTML Extraction Test"
+
+[[index]]
+url = "https://api.example.com/index"
+type = "json"
+json_path = "data.content"
+links = ".article-link"
+"""
+        gensi_path = temp_dir / 'html_extraction.gensi'
+        gensi_path.write_text(content)
+
+        # Should parse successfully - backward compatible
+        parser = GensiParser(gensi_path)
+        assert parser.indices[0]['type'] == 'json'
+        assert parser.indices[0]['json_path'] == 'data.content'
+        assert parser.indices[0]['links'] == '.article-link'
+
+    def test_json_index_requires_json_path(self, temp_dir):
+        """Test that json_path is still required even without links."""
+        content = """
+title = "Missing json_path"
+
+[[index]]
+url = "https://api.example.com/articles"
+type = "json"
+"""
+        gensi_path = temp_dir / 'missing_path.gensi'
+        gensi_path.write_text(content)
+
+        # Should raise - json_path still required
+        with pytest.raises(ValueError, match="json_path.*required"):
             GensiParser(gensi_path)
 
     def test_valid_article_json_string_path(self, temp_dir):

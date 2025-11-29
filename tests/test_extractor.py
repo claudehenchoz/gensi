@@ -784,6 +784,162 @@ return articles
         assert articles[1]['url'] == 'http://example.com/post/second/'
 
 
+class TestJSONDirectLinksExtraction:
+    """Test direct URL extraction from JSON (new feature)."""
+
+    def test_json_direct_links_simple(self):
+        """Test basic direct links extraction from JSON."""
+        json_response = '''
+        {
+            "results": [
+                {"permalink": "https://example.com/article1"},
+                {"permalink": "https://example.com/article2"}
+            ]
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'results[*].permalink'
+            # NO 'links' field - triggers direct mode
+        }
+        extractor = Extractor("https://api.example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://example.com/article1'
+        assert articles[1]['url'] == 'https://example.com/article2'
+
+    def test_json_direct_links_url_resolution(self):
+        """Test that relative URLs are resolved correctly."""
+        json_response = '''
+        {
+            "links": [
+                {"url": "/article/1"},
+                {"url": "/article/2"}
+            ]
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'links[*].url'
+        }
+        extractor = Extractor("https://example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://example.com/article/1'
+        assert articles[1]['url'] == 'https://example.com/article/2'
+
+    def test_json_html_extraction_backward_compatibility(self):
+        """Test that HTML extraction mode still works (with links field)."""
+        json_response = '''
+        {
+            "data": {"content": "<div class=\\"links\\"><a href=\\"/a1\\">Link 1</a><a href=\\"/a2\\">Link 2</a></div>"}
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'data.content',
+            'links': 'a'  # CSS selector - triggers HTML extraction mode
+        }
+        extractor = Extractor("https://example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 2
+        assert '/a1' in articles[0]['url']
+        assert '/a2' in articles[1]['url']
+
+    def test_json_direct_links_filters_non_strings(self):
+        """Test that non-string values are filtered out."""
+        json_response = '''
+        {
+            "items": [
+                {"url": "https://example.com/1"},
+                {"url": null},
+                {"url": "https://example.com/2"},
+                {"url": ""}
+            ]
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'items[*].url'
+        }
+        extractor = Extractor("https://example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        # Should only include valid URL strings
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://example.com/1'
+        assert articles[1]['url'] == 'https://example.com/2'
+
+    def test_json_direct_links_nested_paths(self):
+        """Test extracting URLs from nested JSON structures."""
+        json_response = '''
+        {
+            "data": {
+                "posts": [
+                    {"meta": {"link": "https://example.com/post1"}},
+                    {"meta": {"link": "https://example.com/post2"}},
+                    {"meta": {"link": "https://example.com/post3"}}
+                ]
+            }
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'data.posts[*].meta.link'
+        }
+        extractor = Extractor("https://api.example.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 3
+        assert articles[0]['url'] == 'https://example.com/post1'
+        assert articles[1]['url'] == 'https://example.com/post2'
+        assert articles[2]['url'] == 'https://example.com/post3'
+
+    def test_lux_magazine_json_structure(self):
+        """Test extracting URLs from Lux Magazine API structure."""
+        json_response = '''
+        {
+            "results": [
+                {
+                    "id": 9641,
+                    "title": "No Lesbians",
+                    "permalink": "https://lux-magazine.com/article/queer-immigration/",
+                    "excerpt": "Blah",
+                    "date": {"formatted": "July 11, 2025"},
+                    "author": {"name": "Debbie Nathan"}
+                },
+                {
+                    "id": 9642,
+                    "title": "Another Article",
+                    "permalink": "https://lux-magazine.com/article/another/",
+                    "excerpt": "More blah",
+                    "date": {"formatted": "July 12, 2025"},
+                    "author": {"name": "Jane Doe"}
+                }
+            ]
+        }
+        '''
+        config = {
+            'type': 'json',
+            'json_path': 'results[*].permalink'
+        }
+        extractor = Extractor("https://lux-magazine.com/", json_response, content_type='json', config=config)
+
+        articles = extractor.extract_index_articles(config)
+
+        assert len(articles) == 2
+        assert articles[0]['url'] == 'https://lux-magazine.com/article/queer-immigration/'
+        assert articles[1]['url'] == 'https://lux-magazine.com/article/another/'
+
+
 class TestJSONArticleExtraction:
     """Test JSON article extraction functionality."""
 
