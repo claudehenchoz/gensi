@@ -4,43 +4,50 @@ This document provides comprehensive examples of `.gensi` files for various use 
 
 ## Table of Contents
 
-1. [Basic Examples](#basic-examples)
-   - [Minimal Configuration](#minimal-configuration)
-   - [Simple Blog Archive](#simple-blog-archive)
-   - [With Cover Image](#with-cover-image)
-2. [RSS/Atom Feed Examples](#rssatom-feed-examples)
-   - [Basic RSS Feed](#basic-rss-feed)
-   - [RSS with Limit](#rss-with-limit)
-   - [RSS with Content Embedded](#rss-with-content-embedded)
-   - [Atom Feed](#atom-feed)
-3. [Multi-Index EPUBs](#multi-index-epubs)
-   - [Multiple HTML Indices](#multiple-html-indices)
-   - [Mixed HTML and RSS](#mixed-html-and-rss)
-   - [Article Config Override](#article-config-override)
-4. [Advanced Extraction](#advanced-extraction)
-   - [Element Removal](#element-removal)
-   - [Image Control](#image-control)
-   - [Content Replacements](#content-replacements)
-   - [Complete Metadata](#complete-metadata)
-5. [Python Script Examples](#python-script-examples)
-   - [Python Index Extraction](#python-index-extraction)
-   - [Python Article Extraction](#python-article-extraction)
-   - [RSS Filtering with Python](#rss-filtering-with-python)
-   - [Complex Python Logic](#complex-python-logic)
-6. [JSON/GraphQL API Examples](#jsongraphql-api-examples)
-   - [Basic JSON Index](#basic-json-index)
-   - [JSON Article with Metadata](#json-article-with-metadata)
-   - [Mixed JSON and CSS Extraction](#mixed-json-and-css-extraction)
-   - [URL Transformation (Pattern/Template)](#url-transformation-patterntemplate)
-   - [URL Transformation (Python Mode)](#url-transformation-python-mode)
-   - [Complete GraphQL Example](#complete-graphql-example-reportagen-magazine)
-   - [REST API Example](#rest-api-example)
-   - [Simple vs Python Modes](#simple-vs-python-modes-comparison)
-   - [JSON Features Summary](#json-features-summary)
-7. [Real-World Examples](#real-world-examples)
-   - [Online Magazine](#online-magazine)
-   - [Blog with Images](#blog-with-images)
-   - [Newsletter Archive](#newsletter-archive)
+- [.gensi File Examples](#gensi-file-examples)
+  - [Table of Contents](#table-of-contents)
+  - [Basic Examples](#basic-examples)
+    - [Minimal Configuration](#minimal-configuration)
+    - [Simple Blog Archive](#simple-blog-archive)
+    - [With Cover Image](#with-cover-image)
+  - [RSS/Atom Feed Examples](#rssatom-feed-examples)
+    - [Basic RSS Feed](#basic-rss-feed)
+    - [RSS with Limit](#rss-with-limit)
+    - [RSS with Content Embedded](#rss-with-content-embedded)
+    - [Atom Feed](#atom-feed)
+  - [Multi-Index EPUBs](#multi-index-epubs)
+    - [Multiple HTML Indices](#multiple-html-indices)
+    - [Mixed HTML and RSS](#mixed-html-and-rss)
+    - [Article Config Override](#article-config-override)
+  - [Advanced Extraction](#advanced-extraction)
+    - [Element Removal](#element-removal)
+    - [Image Control](#image-control)
+    - [Content Replacements](#content-replacements)
+    - [Complete Metadata](#complete-metadata)
+  - [Python Script Examples](#python-script-examples)
+    - [Python Index Extraction](#python-index-extraction)
+    - [Python Article Extraction](#python-article-extraction)
+    - [RSS Filtering with Python](#rss-filtering-with-python)
+    - [Complex Python Logic](#complex-python-logic)
+  - [JSON/GraphQL API Examples](#jsongraphql-api-examples)
+    - [Basic JSON Index](#basic-json-index)
+    - [JSON Article with Metadata](#json-article-with-metadata)
+    - [Mixed JSON and CSS Extraction](#mixed-json-and-css-extraction)
+    - [URL Transformation (Pattern/Template)](#url-transformation-patterntemplate)
+    - [URL Transformation (Python Mode)](#url-transformation-python-mode)
+    - [REST API Example](#rest-api-example)
+    - [Simple vs Python Modes Comparison](#simple-vs-python-modes-comparison)
+    - [JSON Features Summary](#json-features-summary)
+  - [Real-World Examples](#real-world-examples)
+    - [Online Magazine](#online-magazine)
+    - [Blog with Images](#blog-with-images)
+    - [Newsletter Archive](#newsletter-archive)
+  - [Tips and Best Practices](#tips-and-best-practices)
+    - [CSS Selector Tips](#css-selector-tips)
+    - [Python Script Tips](#python-script-tips)
+    - [Performance Tips](#performance-tips)
+    - [Debugging Tips](#debugging-tips)
+  - [Command-Line Usage](#command-line-usage)
 
 ---
 
@@ -1099,53 +1106,6 @@ content = "article"
 **Available variables:** `url` (string) - The extracted URL
 
 **Return format:** String - The transformed URL
-
----
-
-### Complete GraphQL Example (Reportagen Magazine)
-
-Real-world example using GraphQL API with URL transformation.
-
-```toml
-title = "Reportagen #85 - November 2025"
-author = "Das Magazin für Reportagen"
-language = "de"
-
-[[index]]
-name = "Reportagen"
-# GraphQL query to get magazine issue with list of articles
-url = "https://content.reportagen.com/graphql?query=query%20GET_MAGAZINE_BY_SLUG(%24slug%3A%20ID!)%20%7B%0A%20%20magazin(id%3A%20%24slug%2C%20idType%3A%20SLUG)%20%7B%0A%20%20%20%20content(format%3A%20RENDERED)%0A%20%20%7D%0A%7D&operationName=GET_MAGAZINE_BY_SLUG&variables=%7B%22slug%22%3A%22reportagen-85%22%7D"
-type = "json"
-json_path = "data.magazin.content"  # Extract HTML from GraphQL response
-links = ".block-reportage-teaser__link"  # Find article links in HTML
-
-# Transform article URLs to GraphQL query URLs
-[index.url_transform]
-pattern = '/reportage/([^/]+)/'  # Extract slug from URL
-# Build GraphQL URL to fetch individual article
-template = 'https://content.reportagen.com/graphql?query=query%20GET_REPORTAGE_BY_SLUG(%24slug%3A%20ID!)%20%7B%0A%20%20reportage(id%3A%20%24slug%2C%20idType%3A%20SLUG)%20%7B%0A%20%20%20%20title%0A%20%20%20%20content%0A%20%20%7D%0A%7D&operationName=GET_REPORTAGE_BY_SLUG&variables=%7B%22slug%22%3A%22{1}%22%7D'
-
-[article]
-response_type = "json"  # Articles return JSON
-remove = ["figure"]  # Remove figure elements from content
-
-# Extract both content and title from GraphQL response
-[article.json_path]
-content = "data.reportage.content"
-title = "data.reportage.title"
-```
-
-**How it works:**
-1. Query GraphQL API for magazine issue → Returns JSON with HTML content
-2. Extract HTML from JSON using `json_path`
-3. Find article links in HTML using CSS selector
-4. Transform each link (e.g., `/reportage/slug/`) to GraphQL query URL
-5. Fetch each article from GraphQL API → Returns JSON
-6. Extract content and title from JSON
-7. Remove unwanted elements and build EPUB
-
-**Before this feature:** Required ~80 lines of complex Python code
-**With JSON support:** Just 19 lines of declarative TOML!
 
 ---
 
