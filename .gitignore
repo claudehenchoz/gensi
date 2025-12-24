@@ -47,6 +47,10 @@ htmlcov/
 # Generated files
 *.epub
 *.log
+*.gensi
 
 # OS
 Thumbs.db
+
+
+

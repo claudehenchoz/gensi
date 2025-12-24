@@ -356,7 +356,7 @@ class Extractor:
             # Extract content
             content_elem = self.document.cssselect(content_selector)
             if not content_elem or len(content_elem) == 0:
-                raise ValueError(f"Content selector '{content_selector}' didn't match any elements")
+                raise ValueError(f"Content selector '{content_selector}' didn't match any elements in '{self.base_url}'")
 
             content_elem = content_elem[0]
 
